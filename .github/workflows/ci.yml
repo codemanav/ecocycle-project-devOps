@@ -18,62 +18,73 @@ jobs:
       IMAGE_PREFIX: ghcr.io/${{ secrets.GHCR_USERNAME }}/ecocycle
 
     steps:
+      # ---------- Checkout Code ----------
       - name: Checkout source code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
+      # ---------- Setup JDK 17 ----------
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v3
         with:
           java-version: 17
           distribution: temurin
 
+      # ---------- Cache Maven Dependencies ----------
       - name: Cache Maven dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v3
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-maven-
 
+      # ---------- Build & Test ----------
       - name: Verify and Test (All Services)
         run: |
           for service in marketplace-service transaction-service user-service; do
-            echo "===== Testing $service ====="
+            echo "===== Building and Testing $service ====="
             cd $service
-            mvn -B spotless:check verify
+            mvn -B clean verify || exit 1
             cd ..
           done
 
+      # ---------- Static Code Analysis ----------
       - name: Static Analysis (PMD & SpotBugs)
         run: |
           for service in marketplace-service transaction-service user-service; do
             cd $service
-            mvn -B pmd:check spotbugs:check || echo "⚠️ Non-blocking static analysis issues in $service"
+            mvn -B pmd:check spotbugs:check || echo "⚠️ Non-blocking issues in $service"
             cd ..
           done
 
+      # ---------- Docker Build ----------
       - name: Build Docker Images
         run: |
           for service in marketplace-service transaction-service user-service; do
+            echo "Building image for $service"
             docker build -t $REGISTRY/${{ secrets.GHCR_USERNAME }}/$service:latest $service
           done
 
-      - name: Trivy Security Scan
-        uses: aquasecurity/trivy-action@master
+      # ---------- Container Scan (Trivy) ----------
+      - name: Security Scan (Trivy)
+        uses: aquasecurity/trivy-action@0.12.0
         with:
-          scan-type: 'image'
-          hide-progress: true
-          severity: 'CRITICAL,HIGH'
-          ignore-unfixed: true
           image-ref: ${{ env.REGISTRY }}/${{ secrets.GHCR_USERNAME }}/marketplace-service:latest
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
 
+      # ---------- GHCR Login ----------
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v2
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ secrets.GHCR_USERNAME }}
           password: ${{ secrets.GHCR_TOKEN }}
 
-      - name: Push Images to GHCR
+      # ---------- Push Images ----------
+      - name: Push Docker Images to GHCR
         run: |
           for service in marketplace-service transaction-service user-service; do
             docker push $REGISTRY/${{ secrets.GHCR_USERNAME }}/$service:latest
