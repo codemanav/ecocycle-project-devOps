@@ -9,7 +9,7 @@ on:
 jobs:
   build-test-scan:
     name: Build, Test, Analyze, and Push Docker Images
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     env:
       GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
