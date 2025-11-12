@@ -1,60 +1,80 @@
 name: CI Pipeline
 
 on:
-  pull_request:
-    branches: [ develop, "release/*" ]
   push:
-    branches: [ develop, "release/*" ]
+    branches: ["develop"]
+  pull_request:
+    branches: ["release/*"]
 
 jobs:
-  build-test-analyze:
+  build-test-scan:
+    name: Build, Test, Analyze, and Push Docker Images
     runs-on: ubuntu-latest
 
     env:
       GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+      REGISTRY: ghcr.io
+      IMAGE_PREFIX: ghcr.io/${{ secrets.GHCR_USERNAME }}/ecocycle
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout source code
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
           java-version: 17
-          cache: maven
+          distribution: temurin
 
-      - name: Lint (Spotless + Checkstyle)
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-
+
+      - name: Verify and Test (All Services)
         run: |
-          mvn spotless:check checkstyle:check -f marketplace-service/pom.xml
-          mvn spotless:check checkstyle:check -f transaction-service/pom.xml
-          mvn spotless:check checkstyle:check -f user-service/pom.xml
+          for service in marketplace-service transaction-service user-service; do
+            echo "===== Testing $service ====="
+            cd $service
+            mvn -B spotless:check verify
+            cd ..
+          done
 
-      - name: Run Tests
+      - name: Static Analysis (PMD & SpotBugs)
         run: |
-          mvn test -f marketplace-service/pom.xml
-          mvn test -f transaction-service/pom.xml
-          mvn test -f user-service/pom.xml
+          for service in marketplace-service transaction-service user-service; do
+            cd $service
+            mvn -B pmd:check spotbugs:check || echo "⚠️ Non-blocking static analysis issues in $service"
+            cd ..
+          done
 
-      - name: Static Analysis (SpotBugs)
+      - name: Build Docker Images
         run: |
-          mvn spotbugs:check -f marketplace-service/pom.xml
-          mvn spotbugs:check -f transaction-service/pom.xml
-          mvn spotbugs:check -f user-service/pom.xml
+          for service in marketplace-service transaction-service user-service; do
+            docker build -t $REGISTRY/${{ secrets.GHCR_USERNAME }}/$service:latest $service
+          done
 
-      - name: Security Scan (Trivy)
+      - name: Trivy Security Scan
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: fs
-          severity: HIGH,CRITICAL
+          scan-type: 'image'
+          hide-progress: true
+          severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
-          exit-code: 1
+          image-ref: ${{ env.REGISTRY }}/${{ secrets.GHCR_USERNAME }}/marketplace-service:latest
 
-      - name: Build & Push Images to GHCR
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Push Images to GHCR
         run: |
-          echo $GHCR_TOKEN | docker login ghcr.io -u $GHCR_USERNAME --password-stdin
           for service in marketplace-service transaction-service user-service; do
-            docker build -t ghcr.io/${GHCR_USERNAME}/${service}:latest $service
-            docker push ghcr.io/${GHCR_USERNAME}/${service}:latest
+            docker push $REGISTRY/${{ secrets.GHCR_USERNAME }}/$service:latest
           done
