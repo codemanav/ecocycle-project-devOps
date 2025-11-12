@@ -40,6 +40,15 @@ jobs:
       # ---------- Build & Test ----------
       - name: Verify and Test (All Services)
         run: |
+          export JAVA_HOME=$HOME/.jdk17
+          export PATH=$JAVA_HOME/bin:$PATH
+          export M2_HOME=$HOME/.maven
+          export PATH=$M2_HOME/bin:$PATH
+
+          echo "JAVA_HOME = $JAVA_HOME"
+          java -version
+          mvn -version
+
           for service in marketplace-service transaction-service user-service; do
             echo "===== Building and Testing $service ====="
             cd $service
