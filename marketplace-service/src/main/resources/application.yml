@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5433/marketplace
-    username: ecocycle
-    password: ecocycle
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/marketplace}
+    username: ${SPRING_DATASOURCE_USERNAME:ecocycle}
+    password: ${SPRING_DATASOURCE_PASSWORD:ecocycle}
   jpa:
     hibernate:
       ddl-auto: update
@@ -14,5 +14,26 @@ server:
   port: 8081
 
 jwt:
-  secret: my-super-long-secret-key-ecocycle-123456789   # keep same across services
-  expiration: 86400000   # 1 day in ms
+  secret: ${JWT_SECRET:my-super-long-secret-key-ecocycle-123456789}
+  expiration: ${JWT_EXPIRATION_MS:86400000}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:h2:mem:marketplace;DB_CLOSE_DELAY=-1
+    driverClassName: org.h2.Driver
+    username: sa
+    password: 
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  h2:
+    console:
+      enabled: true

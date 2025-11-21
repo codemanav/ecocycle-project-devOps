@@ -29,10 +29,11 @@ public class JwtFilter extends OncePerRequestFilter {
 
         // ✅ Public endpoints (no JWT needed)
         if (path.startsWith("/auth") ||
-                path.startsWith("/v3/api-docs") ||
-                path.startsWith("/swagger-ui") ||
-                path.startsWith("/swagger-resources") ||
-                path.equals("/error")) {
+            path.startsWith("/v3/api-docs") ||
+            path.startsWith("/swagger-ui") ||
+            path.startsWith("/swagger-resources") ||
+            path.startsWith("/actuator") ||
+            path.equals("/error")) {
             filterChain.doFilter(request, response);
             return;
         }
