@@ -7,8 +7,9 @@ on:
       - 'release/**'
   push:
     branches:
+      - '**'
       - 'main'
-
+      
 jobs:
   build-test:
     runs-on: self-hosted
@@ -24,7 +25,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           cache: 'maven'
-      - name: Build & Test (${{ matrix.service }})
+      - name: Build & Test (${ { matrix.service } })
         working-directory: ${{ matrix.service }}
         run: mvn -q -DskipTests=false test
       - name: Verify (SpotBugs/Checkstyle if configured)
@@ -57,18 +58,14 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           cache: 'maven'
-      - name: OWASP Dependency Check
-        uses: dependency-check/Dependency-Check_Action@v4.2.1
-        with:
-          project: ${{ matrix.service }}
-          path: ${{ matrix.service }}
-          format: 'HTML'
-          out: 'reports/${{ matrix.service }}'
-      - name: Upload Report
+      - name: Run OWASP Dependency Check (Maven plugin)
+        working-directory: ${{ matrix.service }}
+        run: mvn -q -DskipTests=true org.owasp:dependency-check-maven:check
+      - name: Upload Dependency Report
         uses: actions/upload-artifact@v4
         with:
           name: depcheck-${{ matrix.service }}
-          path: reports/${{ matrix.service }}
+          path: ${{ matrix.service }}/target/dependency-check-report.html
 
   build-images:
     needs: [build-test, dependency-review, vuln-scan]
@@ -147,14 +144,16 @@ jobs:
         uses: appleboy/ssh-action@v1.1.0
         with:
           host: ${{ secrets.PROD_HOST }}
-          username: ${{ secrets.PROD_USER }}
-          key: ${{ secrets.PROD_SSH_KEY }}
+            username: ${{ secrets.PROD_USER }}
+            key: ${{ secrets.PROD_SSH_KEY }}
           script: |
             echo 'Starting production deployment'
             docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.CR_PAT }}
+            # (Assumes same docker-compose.auto.yml strategy or a pre-existing compose file)
             docker pull ghcr.io/${{ github.repository_owner }}/marketplace-service:${{ github.sha }}
             docker pull ghcr.io/${{ github.repository_owner }}/transactions-service:${{ github.sha }}
             docker pull ghcr.io/${{ github.repository_owner }}/users-service:${{ github.sha }}
+            # Replace running containers
             docker stop marketplace || true && docker rm marketplace || true
             docker stop transactions || true && docker rm transactions || true
             docker stop users || true && docker rm users || true
