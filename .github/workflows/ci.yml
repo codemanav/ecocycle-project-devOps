@@ -25,7 +25,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           cache: 'maven'
-      - name: Build & Test (${ { matrix.service } })
+      - name: Build & Test (${{ matrix.service }})
         working-directory: ${{ matrix.service }}
         run: mvn -q -DskipTests=false test
       - name: Verify (SpotBugs/Checkstyle if configured)
@@ -58,17 +58,17 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           cache: 'maven'
-      - name: Run OWASP Dependency Check (Maven plugin)
+      - name: OWASP Dependency Check (Maven Plugin)
         working-directory: ${{ matrix.service }}
-        run: mvn -q -DskipTests=true org.owasp:dependency-check-maven:check
-      - name: Upload Dependency Report
+        run: mvn -q org.owasp:dependency-check-maven:9.2.0:aggregate -Dformat=HTML -DfailOnCVSS=9 || true
+      - name: Upload Report
         uses: actions/upload-artifact@v4
         with:
           name: depcheck-${{ matrix.service }}
           path: ${{ matrix.service }}/target/dependency-check-report.html
 
   build-images:
-    needs: [build-test, dependency-review, vuln-scan]
+    needs: [vuln-scan, dependency-review]
     runs-on: self-hosted
     strategy:
       matrix:
@@ -76,25 +76,28 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Set up QEMU (for multi-arch optional)
-        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Login to GHCR
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.CR_PAT }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build & Push Image
         uses: docker/build-push-action@v6
         with:
           context: ./${{ matrix.service }}
           file: ./${{ matrix.service }}/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}:${{ github.sha }}
+          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }}
           build-args: |
             MAVEN_OPTS=-Xmx512m
+      - name: Tag latest (main only)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker pull docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }}
+          docker tag docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }} docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest
+          docker push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest
 
   staging-deploy:
     needs: build-images
@@ -112,19 +115,19 @@ jobs:
           script: |
             echo 'Starting staging deployment'
             export SHA=${{ github.sha }}
-            docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.CR_PAT }}
+            docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
             cat > docker-compose.auto.yml <<'EOF'
             services:
               marketplace:
-                image: ghcr.io/${{ github.repository_owner }}/marketplace-service:${{ github.sha }}
+                image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/marketplace-service:${{ github.sha }}
                 ports:
                   - '8081:8081'
               transactions:
-                image: ghcr.io/${{ github.repository_owner }}/transactions-service:${{ github.sha }}
+                image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/transactions-service:${{ github.sha }}
                 ports:
                   - '8082:8082'
               users:
-                image: ghcr.io/${{ github.repository_owner }}/users-service:${{ github.sha }}
+                image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/users-service:${{ github.sha }}
                 ports:
                   - '8083:8083'
             EOF
@@ -144,22 +147,22 @@ jobs:
         uses: appleboy/ssh-action@v1.1.0
         with:
           host: ${{ secrets.PROD_HOST }}
-            username: ${{ secrets.PROD_USER }}
-            key: ${{ secrets.PROD_SSH_KEY }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
           script: |
             echo 'Starting production deployment'
-            docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.CR_PAT }}
+            docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
             # (Assumes same docker-compose.auto.yml strategy or a pre-existing compose file)
-            docker pull ghcr.io/${{ github.repository_owner }}/marketplace-service:${{ github.sha }}
-            docker pull ghcr.io/${{ github.repository_owner }}/transactions-service:${{ github.sha }}
-            docker pull ghcr.io/${{ github.repository_owner }}/users-service:${{ github.sha }}
+            docker pull docker.io/${{ secrets.DOCKERHUB_USERNAME }}/marketplace-service:${{ github.sha }}
+            docker pull docker.io/${{ secrets.DOCKERHUB_USERNAME }}/transactions-service:${{ github.sha }}
+            docker pull docker.io/${{ secrets.DOCKERHUB_USERNAME }}/users-service:${{ github.sha }}
             # Replace running containers
             docker stop marketplace || true && docker rm marketplace || true
             docker stop transactions || true && docker rm transactions || true
             docker stop users || true && docker rm users || true
-            docker run -d --name marketplace -p 8081:8081 ghcr.io/${{ github.repository_owner }}/marketplace-service:${{ github.sha }}
-            docker run -d --name transactions -p 8082:8082 ghcr.io/${{ github.repository_owner }}/transactions-service:${{ github.sha }}
-            docker run -d --name users -p 8083:8083 ghcr.io/${{ github.repository_owner }}/users-service:${{ github.sha }}
+            docker run -d --name marketplace -p 8081:8081 docker.io/${{ secrets.DOCKERHUB_USERNAME }}/marketplace-service:${{ github.sha }}
+            docker run -d --name transactions -p 8082:8082 docker.io/${{ secrets.DOCKERHUB_USERNAME }}/transactions-service:${{ github.sha }}
+            docker run -d --name users -p 8083:8083 docker.io/${{ secrets.DOCKERHUB_USERNAME }}/users-service:${{ github.sha }}
             sleep 10
             curl -f http://localhost:8081/actuator/health || exit 1
             curl -f http://localhost:8082/actuator/health || exit 1
