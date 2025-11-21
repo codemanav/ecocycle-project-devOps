@@ -43,6 +43,7 @@ jobs:
         with:
           fail-on-severity: critical
 
+<<<<<<< HEAD
   vuln-scan:
     needs: build-test
     runs-on: self-hosted
@@ -69,6 +70,38 @@ jobs:
 
   build-images:
     needs: [vuln-scan, dependency-review]
+=======
+  build-images:
+      vuln-scan:
+        needs: build-test
+        runs-on: self-hosted
+        strategy:
+          matrix:
+            service: [marketplace-service, transactions-service, users-service]
+        steps:
+          - name: Checkout
+            uses: actions/checkout@v4
+          - name: Set up JDK 17
+            uses: actions/setup-java@v4
+            with:
+              distribution: 'temurin'
+              java-version: '17'
+              cache: 'maven'
+          - name: OWASP Dependency Check
+            uses: dependency-check/Dependency-Check_Action@v4.2.1
+            with:
+              project: ${{ matrix.service }}
+              path: ${{ matrix.service }}
+              format: 'HTML'
+              out: 'reports/${{ matrix.service }}'
+          - name: Upload Report
+            uses: actions/upload-artifact@v4
+            with:
+              name: depcheck-${{ matrix.service }}
+              path: reports/${{ matrix.service }}
+
+    needs: [build-test, dependency-review]
+>>>>>>> 2a6301a5d39ba563330a0e611cab0d8652dc64d2
     runs-on: self-hosted
     strategy:
       matrix:
