@@ -43,7 +43,6 @@ jobs:
         with:
           fail-on-severity: critical
 
-<<<<<<< HEAD
   vuln-scan:
     needs: build-test
     runs-on: self-hosted
@@ -70,7 +69,6 @@ jobs:
 
   build-images:
     needs: [vuln-scan, dependency-review]
-=======
   build-images:
       vuln-scan:
         needs: build-test
@@ -101,7 +99,6 @@ jobs:
               path: reports/${{ matrix.service }}
 
     needs: [build-test, dependency-review]
->>>>>>> 2a6301a5d39ba563330a0e611cab0d8652dc64d2
     runs-on: self-hosted
     strategy:
       matrix:
