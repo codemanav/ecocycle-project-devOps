@@ -1,7 +1,9 @@
+version: "3.9"
+
 services:
   # Marketplace Service
   marketplace:
-    image: {{ github_registry }}/{{ github_user }}/ecocycle-marketplace-service:{{ image_tag }}
+    image: {{ dockerhub_username }}/ecocycle-marketplace-service:{{ image_tag }}
     container_name: marketplace-service-{{ env_name }}
     restart: unless-stopped
     ports:
@@ -51,7 +53,7 @@ services:
 
   # Transactions Service
   transactions:
-    image: {{ github_registry }}/{{ github_user }}/ecocycle-transactions-service:{{ image_tag }}
+    image: {{ dockerhub_username }}/ecocycle-transactions-service:{{ image_tag }}
     container_name: transactions-service-{{ env_name }}
     restart: unless-stopped
     ports:
@@ -100,7 +102,7 @@ services:
 
   # Users Service
   users:
-    image: {{ github_registry }}/{{ github_user }}/ecocycle-users-service:{{ image_tag }}
+    image: {{ dockerhub_username }}/ecocycle-users-service:{{ image_tag }}
     container_name: users-service-{{ env_name }}
     restart: unless-stopped
     ports:
@@ -110,7 +112,6 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://users-db:5432/users
       SPRING_DATASOURCE_USERNAME: {{ db_username }}
       SPRING_DATASOURCE_PASSWORD: {{ db_password }}
-      JWT_SECRET: {{ jwt_secret }}
       LOGGING_LEVEL_ROOT: INFO
     depends_on:
       users-db:
@@ -154,4 +155,5 @@ volumes:
     name: transactions-db-{{ env_name }}-data
   users-db-data:
     name: users-db-{{ env_name }}-data
+
 

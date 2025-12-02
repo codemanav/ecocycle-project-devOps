@@ -19,13 +19,13 @@
       pause:
         prompt: "Deploy to PRODUCTION? Type 'yes' to continue"
       register: confirm_deploy
-      when: manual_approval | default(true)
+      when: (manual_approval | default(true)) | bool
     
     - name: Abort if not confirmed
       fail:
         msg: "Deployment cancelled"
       when: 
-        - manual_approval | default(true)
+        - (manual_approval | default(true)) | bool
         - confirm_deploy.user_input != "yes"
     
     - name: Check if host is reachable

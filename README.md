@@ -27,7 +27,7 @@ Our solution is that we will design and implement an automated CI/CD pipeline th
 #### Preconditions
 - A release branch exists and branch-protection rules are enabled.  
 - A target VM is reachable via SSH and configured for Ansible.  
-- GitHub Container Registry (GHCR) access is set up.
+- Docker Hub access is set up (images are pushed to `manavshah13/ecocycle-*`).
 
 #### Main Flow
 1. Developer opens a Pull Request (PR) into `release/*`.  
@@ -39,7 +39,7 @@ Our solution is that we will design and implement an automated CI/CD pipeline th
    - If all checks pass → proceed to step 3.  
    - **If tests or scans fail**, the pipeline terminates (**[E1]**, **[E2]**).  
 3. **Image Build and Push**  
-   - If all checks pass, Docker images for Marketplace, Transactions, and Users are built and pushed to GHCR.
+   - If all checks pass, Docker images for Marketplace, Transactions, and Users are built and pushed to Docker Hub.
 4. **Continuous Deployment (Staging Environment)**  
    - Ansible provisions the remote server (installs Docker, pulls images, starts docker compose up -d).
    - Executes **health checks on staging**  

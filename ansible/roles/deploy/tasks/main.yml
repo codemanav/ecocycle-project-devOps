@@ -15,6 +15,17 @@
     dest: "{{ app_dir }}/{{ compose_file }}"
     owner: "{{ deploy_user }}"
     mode: '0644'
+    force: yes
+
+- name: Remove any existing containers with conflicting names (safe cleanup)
+  shell: |
+    docker rm -f marketplace-service-staging marketplace-service-prod \
+      transactions-service-staging transactions-service-prod \
+      users-service-staging users-service-prod \
+      marketplace-db-staging marketplace-db-prod \
+      transactions-db-staging transactions-db-prod \
+      users-db-staging users-db-prod || true
+  changed_when: false
 
 - name: Deploy services (pull, stop, start)
   community.docker.docker_compose_v2:
