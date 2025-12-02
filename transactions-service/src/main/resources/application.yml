@@ -1,8 +1,8 @@
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5433/marketplace
-    username: ecocycle
-    password: ecocycle
+    username: ${DB_USERNAME:ecocycle}
+    password: ${DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: update

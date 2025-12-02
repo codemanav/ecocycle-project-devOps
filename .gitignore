@@ -58,6 +58,8 @@ Thumbs.db
 *.pem
 *.key
 *.crt
+*keys
+*keys.pub
 secrets/
 credentials/
 

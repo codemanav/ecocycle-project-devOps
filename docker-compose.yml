@@ -11,7 +11,7 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://marketplace-db:5432/marketplace
       SPRING_DATASOURCE_USERNAME: ecocycle
-      SPRING_DATASOURCE_PASSWORD: ecocycle
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
     depends_on:
       - marketplace-db
 
@@ -21,7 +21,7 @@ services:
     environment:
       POSTGRES_DB: marketplace
       POSTGRES_USER: ecocycle
-      POSTGRES_PASSWORD: ecocycle
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
       - "5433:5432"
 
@@ -36,7 +36,7 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://transactions-db:5432/transactions
       SPRING_DATASOURCE_USERNAME: ecocycle
-      SPRING_DATASOURCE_PASSWORD: ecocycle
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       MARKETPLACE_BASE_URL: http://marketplace:8081
       USERS_BASE_URL: http://users:8083
     depends_on:
@@ -50,7 +50,7 @@ services:
     environment:
       POSTGRES_DB: transactions
       POSTGRES_USER: ecocycle
-      POSTGRES_PASSWORD: ecocycle
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
       - "5434:5432"
 
@@ -65,7 +65,7 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://users-db:5432/users
       SPRING_DATASOURCE_USERNAME: ecocycle
-      SPRING_DATASOURCE_PASSWORD: ecocycle
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
     depends_on:
       - users-db
 
@@ -75,7 +75,7 @@ services:
     environment:
       POSTGRES_DB: users
       POSTGRES_USER: ecocycle
-      POSTGRES_PASSWORD: ecocycle
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
       - "5435:5432"
 

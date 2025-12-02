@@ -14,7 +14,7 @@ services:
       SPRING_PROFILES_ACTIVE: staging
       SPRING_DATASOURCE_URL: jdbc:postgresql://marketplace-db:5432/marketplace
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-ecocycle}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-ecocycle}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       LOGGING_LEVEL_ROOT: INFO
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
@@ -42,7 +42,7 @@ services:
     environment:
       POSTGRES_DB: marketplace
       POSTGRES_USER: ${DB_USERNAME:-ecocycle}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-ecocycle}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_INITDB_ARGS: "-E UTF8"
     volumes:
       - marketplace-db-data:/var/lib/postgresql/data
@@ -72,7 +72,7 @@ services:
       SPRING_PROFILES_ACTIVE: staging
       SPRING_DATASOURCE_URL: jdbc:postgresql://transactions-db:5432/transactions
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-ecocycle}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-ecocycle}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       MARKETPLACE_BASE_URL: http://marketplace:8081
       USERS_BASE_URL: http://users:8083
@@ -106,7 +106,7 @@ services:
     environment:
       POSTGRES_DB: transactions
       POSTGRES_USER: ${DB_USERNAME:-ecocycle}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-ecocycle}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_INITDB_ARGS: "-E UTF8"
     volumes:
       - transactions-db-data:/var/lib/postgresql/data
@@ -136,7 +136,7 @@ services:
       SPRING_PROFILES_ACTIVE: staging
       SPRING_DATASOURCE_URL: jdbc:postgresql://users-db:5432/users
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-ecocycle}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-ecocycle}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       LOGGING_LEVEL_ROOT: INFO
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
@@ -164,7 +164,7 @@ services:
     environment:
       POSTGRES_DB: users
       POSTGRES_USER: ${DB_USERNAME:-ecocycle}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-ecocycle}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_INITDB_ARGS: "-E UTF8"
     volumes:
       - users-db-data:/var/lib/postgresql/data
