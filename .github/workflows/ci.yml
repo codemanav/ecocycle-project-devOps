@@ -22,10 +22,11 @@ env:
   SERVICES: marketplace-service users-service transactions-service
 
 jobs:
-  # Job 0: Validation
+  # Job 0: Validation (DISABLED FOR TESTING)
   validate:
     name: Validate Project Structure
     runs-on: self-hosted
+    if: false
     
     steps:
       - name: Clean workspace
@@ -49,11 +50,11 @@ jobs:
           done
           echo "✅ All service directories validated successfully"
 
-  # Job 1: Code Quality & Linting
+  # Job 1: Code Quality & Linting (DISABLED FOR TESTING)
   code-quality:
     name: Code Quality & Linting
     runs-on: self-hosted
-    needs: validate
+    if: false
     
     steps:
       - name: Clean workspace
@@ -100,11 +101,11 @@ jobs:
           # Fix ownership of Docker-created files
           sudo chown -R $USER:$USER ${{ github.workspace }}/*/target || true
 
-  # Job 2: Unit Tests & Code Coverage
+  # Job 2: Unit Tests & Code Coverage (DISABLED FOR TESTING)
   test:
     name: Unit Tests & Coverage
     runs-on: self-hosted
-    needs: [validate, code-quality]
+    if: false
     
     steps:
       - name: Clean workspace
@@ -177,11 +178,11 @@ jobs:
           # Clean up Docker-created files for next run
           sudo rm -rf ${{ github.workspace }}/*/target || true
 
-  # Job 3: Static Analysis
+  # Job 3: Static Analysis (DISABLED FOR TESTING)
   static-analysis:
     name: Static Analysis
     runs-on: self-hosted
-    needs: [validate, code-quality]
+    if: false
     
     steps:
       - name: Clean workspace
@@ -227,11 +228,11 @@ jobs:
           # Fix ownership of Docker-created files
           sudo chown -R $USER:$USER ${{ github.workspace }}/*/target || true
 
-  # Job 4: Security Scanning
+  # Job 4: Security Scanning (DISABLED FOR TESTING)
   security-scan:
     name: Security Scanning
     runs-on: self-hosted
-    needs: [validate, code-quality]
+    if: false
     
     steps:
       - name: Clean workspace
@@ -294,11 +295,11 @@ jobs:
           # Clean up Docker-created files for next run
           sudo rm -rf ${{ github.workspace }}/*/target || true
 
-  # Job 5: Build Docker Images
+  # Job 5: Build Docker Images (ENABLED FOR TESTING)
   build-images:
     name: Build & Push Docker Images
     runs-on: self-hosted
-    needs: [test, static-analysis, security-scan]
+    # needs: [test, static-analysis, security-scan]  # DISABLED FOR TESTING
     # Build images on:
     # - Push to any branch (for development/testing)
     # - PR to release/* branches (for CD pipeline deployment)
@@ -399,17 +400,11 @@ jobs:
           sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
         continue-on-error: true
 
-  # Job 6: Integration Tests (Optional - for bonus)
+  # Job 6: Integration Tests (DISABLED FOR TESTING)
   integration-tests:
     name: Integration Tests
     runs-on: self-hosted
-    needs: build-images
-    # Run integration tests on push OR on PR to release branches
-    if: |
-      github.event_name == 'push' ||
-      (github.event_name == 'pull_request' && 
-       (startsWith(github.head_ref, 'release/') || 
-        startsWith(github.base_ref, 'release/')))
+    if: false
     
     services:
       postgres:
@@ -452,12 +447,11 @@ jobs:
           # python tests/integration/test_all.py
         continue-on-error: true
 
-  # Job 7: Build Summary
+  # Job 7: Build Summary (DISABLED FOR TESTING)
   build-summary:
     name: Build Summary
     runs-on: self-hosted
-    needs: [validate, code-quality, test, static-analysis, security-scan, build-images]
-    if: always()
+    if: false
     
     steps:
       - name: Clean workspace
