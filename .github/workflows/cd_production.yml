@@ -53,7 +53,7 @@ jobs:
       - name: Deploy to Production
         run: |
           cd ansible
-          IMAGE_TAG="${{ github.event.inputs.image_tag || github.ref_name }}"
+          IMAGE_TAG="${{ github.event.inputs.image_tag || github.event.workflow_run.head_branch || 'latest' }}"
           ansible-playbook -i inventory/production.ini playbooks/deploy_production.yml \
             -e "image_tag=${IMAGE_TAG}" \
             -e "dockerhub_username=${{ env.DOCKERHUB_USERNAME }}" \
