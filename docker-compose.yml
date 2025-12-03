@@ -78,3 +78,16 @@ services:
       POSTGRES_PASSWORD: ecocycle
     ports:
       - "5435:5432"
+
+  # =======================
+  # Frontend
+  # =======================
+  frontend:
+    build: ./frontend
+    container_name: ecocycle-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - marketplace
+      - transactions
+      - users

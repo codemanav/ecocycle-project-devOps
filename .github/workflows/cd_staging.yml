@@ -66,8 +66,8 @@ jobs:
         run: |
           cd ansible
 
-          # Use manual input OR use the branch name as image tag
-          IMAGE_TAG="${{ github.event.inputs.image_tag || github.event.workflow_run.head_branch || 'latest' }}"
+          # Use manual input OR default to latest
+          IMAGE_TAG="${{ github.event.inputs.image_tag || 'latest' }}"
 
           ansible-playbook -i inventory/staging.ini playbooks/deploy_staging.yml \
             -e "image_tag=${IMAGE_TAG}" \
@@ -83,6 +83,7 @@ jobs:
           echo "✅ Deployment completed successfully" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** ${{ github.event.workflow_run.head_branch || github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Services:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend: http://${{ env.ANSIBLE_HOST }}" >> $GITHUB_STEP_SUMMARY
           echo "- Marketplace: http://${{ env.ANSIBLE_HOST }}:8081" >> $GITHUB_STEP_SUMMARY
           echo "- Users: http://${{ env.ANSIBLE_HOST }}:8083" >> $GITHUB_STEP_SUMMARY
           echo "- Transactions: http://${{ env.ANSIBLE_HOST }}:8082" >> $GITHUB_STEP_SUMMARY

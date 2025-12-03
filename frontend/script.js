@@ -25,7 +25,7 @@ function register() {
         return;
     }
 
-    fetch("http://localhost:8083/auth/register?email=" + encodeURIComponent(email) + 
+    fetch("/auth/register?email=" + encodeURIComponent(email) + 
           "&username=" + encodeURIComponent(username), {
         method: "POST"
     })
@@ -58,7 +58,7 @@ function login() {
         return;
     }
 
-    fetch("http://localhost:8083/auth/login?email=" + encodeURIComponent(email), {
+    fetch("/auth/login?email=" + encodeURIComponent(email), {
         method: "POST"
     })
     .then(res => {
@@ -95,9 +95,19 @@ function callService(service) {
     
     let url = "";
 
-    if (service === "users") url = "http://localhost:8083/users";
-    if (service === "marketplace") url = "http://localhost:8081/listings";
-    if (service === "transactions") url = "http://localhost:8082/transactions";
+    if (service === "users") url = "/users";
+    if (service === "marketplace") url = "/listings";
+    if (service === "transactions") {
+        // For transactions, we need a transaction ID from the input field
+        const transactionIdInput = document.getElementById("transactionIdInput");
+        const transactionId = transactionIdInput ? transactionIdInput.value.trim() : "";
+        if (!transactionId || transactionId === "") {
+            alert("Please enter a Transaction ID");
+            document.getElementById("result").textContent = "Error: Transaction ID is required. Please enter a Transaction ID in the input field.";
+            return;
+        }
+        url = "/transactions/" + transactionId;
+    }
 
     if (!url) {
         document.getElementById("result").textContent = "Error: Unknown service";
@@ -111,7 +121,9 @@ function callService(service) {
     })
     .then(res => {
         if (!res.ok) {
-            throw new Error("HTTP " + res.status);
+            return res.text().then(text => {
+                throw new Error(text || "HTTP " + res.status);
+            });
         }
         return res.json();
     })

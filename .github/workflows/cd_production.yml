@@ -71,11 +71,13 @@ jobs:
           echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Services:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend: http://${{ env.ANSIBLE_HOST }}:8080" >> $GITHUB_STEP_SUMMARY
           echo "- Marketplace: http://${{ env.ANSIBLE_HOST }}:9081" >> $GITHUB_STEP_SUMMARY
           echo "- Users: http://${{ env.ANSIBLE_HOST }}:9083" >> $GITHUB_STEP_SUMMARY
           echo "- Transactions: http://${{ env.ANSIBLE_HOST }}:9082" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Health Checks:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend: http://${{ env.ANSIBLE_HOST }}:8080/health" >> $GITHUB_STEP_SUMMARY
           echo "- Marketplace: http://${{ env.ANSIBLE_HOST }}:9081/actuator/health" >> $GITHUB_STEP_SUMMARY
           echo "- Users: http://${{ env.ANSIBLE_HOST }}:9083/actuator/health" >> $GITHUB_STEP_SUMMARY
           echo "- Transactions: http://${{ env.ANSIBLE_HOST }}:9082/actuator/health" >> $GITHUB_STEP_SUMMARY

@@ -1,7 +1,7 @@
 ---
 # Health check role - Verifies all services are healthy
 
-- name: Check service health
+- name: Check backend service health
   uri:
     url: "http://{{ ansible_host }}:{{ item.port }}/actuator/health"
     method: GET
@@ -19,16 +19,32 @@
   loop_control:
     label: "{{ item.name }}"
 
-- name: Display health check results
+- name: Check frontend health
+  uri:
+    url: "http://{{ ansible_host }}:{{ frontend_port | default(80) }}/health"
+    method: GET
+    status_code: 200
+    timeout: "{{ health_check_timeout }}"
+  register: frontend_health
+  retries: "{{ health_check_retries }}"
+  delay: "{{ health_check_delay }}"
+  until: frontend_health.status == 200
+  failed_when: false
+
+- name: Display backend health check results
   debug:
     msg: "{{ item.item.name }} Service: {{ 'HEALTHY' if item.status == 200 else 'UNHEALTHY' }}"
   loop: "{{ health_results.results }}"
   loop_control:
     label: "{{ item.item.name }}"
 
+- name: Display frontend health check result
+  debug:
+    msg: "Frontend: {{ 'HEALTHY' if (frontend_health is defined and frontend_health.status == 200) else 'UNHEALTHY' }}"
+
 - name: Check if all services are healthy
   set_fact:
-    all_healthy: "{{ health_results.results | map(attribute='status') | list | select('equalto', 200) | list | length == 3 }}"
+    all_healthy: "{{ (health_results.results | map(attribute='status') | list | select('equalto', 200) | list | length == 3) and (frontend_health is defined and frontend_health.status == 200) }}"
 
 - name: Fail if any service is unhealthy
   fail:
