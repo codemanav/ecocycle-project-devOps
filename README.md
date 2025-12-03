@@ -28,7 +28,7 @@
 - [Quick Start Summary](#quick-start-summary)
 
 
-## <a id="overview"></a>🎯 Overview
+## <a id="overview"></a>Overview
 
 EcoCycle is a **sustainability-focused marketplace platform** with three Spring Boot microservices (Marketplace, Transactions, Users) and an Nginx-based frontend. This project implements a **production-ready CI/CD pipeline** using GitHub Actions and Ansible that automates:
 
@@ -48,7 +48,7 @@ EcoCycle is a **sustainability-focused marketplace platform** with three Spring 
 
 ---
 
-## <a id="architecture"></a>🏗️ Architecture
+## <a id="architecture"></a>Architecture
 
 ```mermaid
 graph TB
@@ -209,167 +209,16 @@ workflow_run:
 4. Verify all services are healthy.
 5. Rollback if any service fails health checks.
 
----
 
-## <a id="infrastructure-as-code"></a>🏢 Infrastructure as Code
+## <a id="infrastructure-as-code"></a>Infrastructure as Code
 
-### Ansible Roles
+All deployment is automated with Ansible. We have three roles:
 
-#### 1. Common Role (`ansible/roles/common/tasks/main.yml`)
+1. **Common Role** - Sets up the VM (Docker, firewall, directories, log rotation).
+2. **Deploy Role** - Pulls images from Docker Hub and deploys with Docker Compose.
+3. **Healthcheck Role** - Verifies all services are healthy (retries up to 15 times).
 
-**Purpose:** Provision and configure the VM
-
-```yaml
-Tasks:
-1. Update system packages (apt update && apt upgrade)
-2. Install Docker and Docker Compose
-3. Add deploy_user to docker group
-4. Configure UFW firewall (production only):
-   - Allow SSH (22)
-   - Allow frontend port (80/8080)
-   - Allow service ports (8081-8083 or 9081-9083)
-   - Enable UFW
-5. Create directories:
-   - {{ app_dir }} (~/ecocycle-project)
-   - {{ app_dir }}/logs
-   - {{ app_dir }}/backups
-6. Setup log rotation (logrotate.j2 template)
-7. Create environment file from template (env.j2)
-```
-
-**Firewall Configuration:**
-```yaml
-- name: Allow SSH
-  ufw:
-    rule: allow
-    port: 22
-    proto: tcp
-
-- name: Allow frontend port
-  ufw:
-    rule: allow
-    port: "{{ frontend_port }}"
-    proto: tcp
-
-- name: Enable UFW
-  ufw:
-    state: enabled
-  when: env_name == 'production'  # Production only
-```
-
-#### 2. Deploy Role (`ansible/roles/deploy/tasks/main.yml`)
-
-**Purpose:** Pull images and deploy services
-
-```yaml
-Tasks:
-1. Login to Docker Hub (credentials from secrets, no_log: true)
-2. Copy docker-compose template to server:
-   - docker-compose.staging.yml.j2 → docker-compose.staging.yml
-   - Variables: image_tag, dockerhub_username, ports, env_name
-3. Remove existing containers (safe cleanup):
-   docker rm -f marketplace-service-{{ env_name }} ...
-4. Deploy with Docker Compose v2:
-   community.docker.docker_compose_v2:
-     project_src: "{{ app_dir }}"
-     files: ["{{ compose_file }}"]
-     state: present
-     pull: always        # Pull latest images
-     recreate: always    # Force recreate containers
-5. Wait for services (pause: 30 seconds)
-```
-
-**Docker Compose Template (docker-compose.staging.yml.j2):**
-```yaml
-services:
-  marketplace:
-    image: {{ dockerhub_username }}/ecocycle-marketplace-service:{{ image_tag }}
-    container_name: marketplace-service-{{ env_name }}
-    ports:
-      - "{{ marketplace_port }}:8081"
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://marketplace-db-{{ env_name }}:5432/marketplace
-      SPRING_DATASOURCE_USERNAME: {{ db_username }}
-      SPRING_DATASOURCE_PASSWORD: {{ vault_db_password }}  # From Ansible Vault
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-```
-
-#### 3. Healthcheck Role (`ansible/roles/healthcheck/tasks/main.yml`)
-
-**Purpose:** Verify all services are healthy post-deployment
-
-```yaml
-Tasks:
-1. Check backend services:
-   - URI: http://{{ ansible_host }}:{{ port }}/actuator/health
-   - Retry: {{ health_check_retries }} times (10 for staging, 15 for production)
-   - Delay: {{ health_check_delay }} seconds between retries (5s)
-   - Expected: HTTP 200 OK with {"status": "UP"}
-   
-2. Check frontend:
-   - URI: http://{{ ansible_host }}:{{ frontend_port }}/health
-   - Same retry logic
-   
-3. Display health status:
-   - Marketplace Service: HEALTHY
-   - Users Service: HEALTHY
-   - Transactions Service: HEALTHY
-   - Frontend: HEALTHY
-   
-4. Check all_healthy fact:
-   - all_healthy: true if all services return 200
-   - all_healthy: false if any service fails
-   
-5. Fail deployment if unhealthy:
-   - fail: "Health check failed! One or more services are not healthy."
-   - Triggers rollback workflow
-   
-6. Display container status:
-   - docker compose ps
-```
-
-**Health Check Retry Logic:**
-```yaml
-- name: Check backend service health
-  uri:
-    url: "http://{{ ansible_host }}:{{ item.port }}/actuator/health"
-    method: GET
-    status_code: 200
-    timeout: 10
-  register: health_results
-  retries: 15              # Try up to 15 times
-  delay: 5                 # Wait 5 seconds between attempts
-  until: health_results.status == 200
-  failed_when: false       # Don't fail immediately, aggregate results
-```
-
-### Rollback Playbook
-
-**Location:** `ansible/playbooks/rollback.yml`
-
-**Usage:**
-```bash
-# Rollback staging
-ansible-playbook playbooks/rollback.yml -e "target_env=staging"
-
-# Rollback production
-ansible-playbook playbooks/rollback.yml -e "target_env=production"
-```
-
-**Process:**
-1. Stop current containers
-2. Restore previous image tag (stored in backup)
-3. Deploy with previous tag
-4. Run health checks
-5. Verify rollback success
-
----
+Playbooks are in `ansible/playbooks/` and roles are in `ansible/roles/`. Secrets are encrypted with Ansible Vault (AES256).
 
 ## <a id="microservices"></a>Microservices
 
@@ -382,8 +231,6 @@ ansible-playbook playbooks/rollback.yml -e "target_env=production"
 **Frontend** - Nginx reverse proxy serving static HTML/JS/CSS and proxying API calls to backend services
 
 All services use Spring Boot Actuator for health checks at `/actuator/health`.
-
----
 
 ## <a id="security-implementation"></a>Security Implementation
 
@@ -422,14 +269,14 @@ All services use Spring Boot Actuator for health checks at `/actuator/health`.
 
 ### 3. Secrets Management
 
-#### GitHub Secrets
+#### 1. GitHub Secrets
 - **Encryption:** AES256 at rest.
 
-#### Ansible Vault
+#### 2. Ansible Vault
 - **Algorithm:** AES256 Encryption.
 - **Access control:** Only CI/CD takes the vault password from github secrets.
 
-#### Credential Masking (`ansible/roles/deploy/tasks/main.yml`)
+#### 3. Credential Masking (`ansible/roles/deploy/tasks/main.yml`)
 ```yaml
 - name: Login to Docker Hub
   docker_login:
@@ -440,25 +287,12 @@ All services use Spring Boot Actuator for health checks at `/actuator/health`.
 
 ### 4. Network Security
 
-#### UFW Firewall (Production Only)
-```yaml
-# ansible/roles/common/tasks/main.yml
-  ufw:
-    rule: allow
-    port: "{{ item }}"
-  loop:
-    - 22      # SSH
-    - 8080    # Frontend
-    - 9081    # Marketplace
-    - 9082    # Transactions
-    - 9083    # Users
-  when: env_name == 'production'
-```
+#### 1. UFW Firewall
 - **Default:** Deny all inbound traffic
 - **Allowed:** Only SSH + application ports
 - **Impact:** Prevents unauthorized port scanning
 
-#### SSH Hardening (`.github/workflows/cd_*.yml`)
+#### 2. SSH Hardening
 ```yaml
 - name: Configure SSH
   run: |
@@ -513,7 +347,7 @@ services:
 
 ---
 
-## <a id="setup--deployment"></a>🛠️ Setup & Deployment
+## <a id="setup--deployment"></a>Setup & Deployment
 
 ### Prerequisites
 
@@ -523,11 +357,6 @@ services:
    mkdir actions-runner && cd actions-runner
    ./config.sh --url https://github.ncsu.edu/mdshah5/ecocycle-project --token <TOKEN>
    ./run.sh
-   ```
-
-2. **Docker & Docker Compose** (on deployment VM)
-   ```bash
-   bash scripts/setup-vm.sh  # Automated setup script
    ```
 
 3. **GitHub Secrets** (in repo settings)
@@ -543,9 +372,6 @@ services:
 # Clone repository
 git clone https://github.ncsu.edu/mdshah5/ecocycle-project.git
 cd ecocycle-project
-
-# Build all services
-./scripts/test-local-build.sh
 
 # Run locally with Docker Compose
 docker-compose up -d
@@ -586,12 +412,7 @@ http://152.7.176.20:8081/api/listings  # Marketplace
 ### Deploy to Production
 
 ```bash
-# Option 1: Push to main
-git checkout main
-git merge release/staging
-git push origin main
-
-# Option 2: Push to release/production
+# Option 1: Push to release/production
 git checkout -b release/production
 git push origin release/production
 
@@ -607,34 +428,7 @@ http://152.7.176.20:8080              # Frontend
 http://152.7.176.20:9081/api/listings  # Marketplace
 ```
 
-### Manual Deployment (Ansible)
-
-```bash
-cd ansible
-
-# Deploy to staging
-ansible-playbook -i inventory/staging.ini playbooks/deploy_staging.yml \
-  -e "image_tag=latest"
-
-# Deploy to production
-ansible-playbook -i inventory/production.ini playbooks/deploy_production.yml \
-  -e "image_tag=latest" \
-  --ask-vault-pass
-
-# Specific image tag
-ansible-playbook -i inventory/staging.ini playbooks/deploy_staging.yml \
-  -e "image_tag=sha-abc1234"
-
-# Dry run (check mode)
-ansible-playbook -i inventory/staging.ini playbooks/deploy_staging.yml --check --diff
-
-# Rollback
-ansible-playbook playbooks/rollback.yml -e "target_env=staging"
-```
-
----
-
-## <a id="testing--quality-gates"></a>📊 Testing & Quality Gates
+## <a id="testing--quality-gates"></a>Testing & Quality Gates
 
 ### Unit Tests
 
@@ -671,8 +465,6 @@ transactions-service/src/test/java/
 
 ### Integration Tests
 
-**Location:** `.github/workflows/ci.yml` 
-
 ```yaml
 # Runs after Docker builds
 integration-tests:
@@ -686,8 +478,6 @@ integration-tests:
 ```
 
 ### Health Check Tests
-
-**Script:** `scripts/test-health-checks.sh`
 
 ```bash
 #!/bin/bash
@@ -722,7 +512,7 @@ echo "[OK] All health checks passed"
 
 ---
 
-## <a id="monitoring--health-checks"></a>📈 Monitoring & Health Checks
+## <a id="monitoring--health-checks"></a>Monitoring & Health Checks
 
 ### Spring Boot Actuator
 
@@ -740,174 +530,7 @@ management:
       show-details: always
 ```
 
-**Health Check Response:**
-```json
-{
-  "status": "UP",
-  "components": {
-    "db": {
-      "status": "UP",
-      "details": {
-        "database": "PostgreSQL",
-        "validationQuery": "isValid()"
-      }
-    },
-    "diskSpace": {
-      "status": "UP",
-      "details": {
-        "total": 107374182400,
-        "free": 53687091200,
-        "threshold": 10485760
-      }
-    }
-  }
-}
-```
-
-### Docker Health Checks
-
-**Configuration:** All service Dockerfiles
-
-```dockerfile
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-    CMD wget --spider http://localhost:8081/actuator/health || exit 1
-```
-
-**Check Status:**
-```bash
-docker ps  # Shows health status in STATUS column
-# CONTAINER ID   IMAGE                        STATUS
-# abc123         marketplace-service:latest   Up 2 minutes (healthy)
-```
-
-### Ansible Health Verification
-
-**Process (ansible/roles/healthcheck/tasks/main.yml):**
-1. Check each service HTTP endpoint
-2. Retry up to 15 times (5 seconds between attempts)
-3. Aggregate results
-4. Fail deployment if any service unhealthy
-5. Display container status
-
-**Example Output:**
-```
-TASK [healthcheck : Display health check results]
-ok: [staging] => 
-  msg: "Marketplace Service: HEALTHY"
-ok: [staging] => 
-  msg: "Users Service: HEALTHY"
-ok: [staging] => 
-  msg: "Transactions Service: HEALTHY"
-ok: [staging] => 
-  msg: "Frontend: HEALTHY"
-
-TASK [healthcheck : Check if all services are healthy]
-ok: [staging] => 
-  all_healthy: true
-```
-
----
-
-## <a id="troubleshooting"></a>🐛 Troubleshooting
-
-### CI Pipeline Issues
-
-#### Issue: Maven build fails with "Permission denied"
-**Cause:** Docker creates root-owned files in `target/` directories  
-**Solution:** Cleanup step runs `sudo chown -R $USER:$USER */target`
-
-#### Issue: OWASP Dependency Check timeout
-**Cause:** NVD API rate limiting  
-**Solution:** Disabled auto-update (`<autoUpdate>false</autoUpdate>`) in pom.xml
-
-#### Issue: Checkstyle violations
-**Cause:** Code doesn't follow Google Java Style Guide  
-**Solution:** Run locally before pushing
-```bash
-mvn checkstyle:check
-```
-
-### Deployment Issues
-
-#### Issue: SSH connection failed
-**Cause:** Incorrect SSH key or host key mismatch  
-**Solution:**
-```bash
-# Test SSH manually
-ssh -i ~/.ssh/id_rsa mdshah5@152.7.176.20
-
-# Add to known_hosts
-ssh-keyscan -H 152.7.176.20 >> ~/.ssh/known_hosts
-```
-
-#### Issue: Health check failed
-**Cause:** Service not ready or database connection issue  
-**Solution:**
-```bash
-# SSH to VM
-ssh mdshah5@152.7.176.20
-
-# Check logs
-cd ~/ecocycle-project
-docker-compose logs marketplace
-
-# Check database
-docker exec -it marketplace-db psql -U ecocycle -d marketplace
-```
-
-#### Issue: Container not starting
-**Cause:** Port conflict or resource constraints  
-**Solution:**
-```bash
-# Check port usage
-sudo netstat -tulpn | grep 8081
-
-# Check container logs
-docker logs marketplace-service-staging
-
-# Check resource usage
-docker stats
-```
-
-### Service Issues
-
-#### Issue: 500 Internal Server Error
-**Cause:** Database connection failure  
-**Solution:** Verify environment variables
-```bash
-# Check .env file
-cat ~/ecocycle-project/.env
-
-# Test database connection
-docker exec marketplace-db psql -U ecocycle -d marketplace -c "SELECT 1;"
-```
-
-#### Issue: Service can't reach other services
-**Cause:** Docker network issue  
-**Solution:**
-```bash
-# Check Docker network
-docker network ls
-docker network inspect ecocycle-project_default
-
-# Test connectivity
-docker exec marketplace-service ping users-service
-```
-
----
-
-## <a id="documentation"></a>📚 Documentation
-
-### Project Documentation
-
-| Document | Location | Description |
-|----------|----------|-------------|
-| **Project Report** | `docs/PROJECT_REPORT.md` | Final project report (5 pages, 2400 words) |
-| **Pipeline Diagrams** | `docs/PIPELINE_DIAGRAMS.md` | Mermaid diagrams for CI/CD flows |
-| **Video Script** | `docs/VIDEO_SCRIPT.md` | Demo video script with timestamps |
-| **Ansible Guide** | `ansible/README.md` | Detailed Ansible usage guide |
-| **Proposal** | `proposal.md` | Original project proposal |
-| **Status Reports** | `docs/status_report_*.md` | Sprint status updates |
+## <a id="documentation"></a>Documentation
 
 ### API Documentation
 
@@ -921,7 +544,7 @@ docker exec marketplace-service ping users-service
 
 ### Code Documentation
 
-**Key Files to Review:**
+**Key Files:**
 
 1. **CI Pipeline:** `.github/workflows/ci.yml`
    - Complete 7-stage CI pipeline definition
@@ -950,7 +573,7 @@ docker exec marketplace-service ping users-service
 
 ---
 
-## <a id="learning-resources"></a>🎓 Learning Resources
+## <a id="learning-resources"></a>Learning
 
 ### DevOps Concepts Implemented
 
@@ -981,17 +604,17 @@ docker exec marketplace-service ping users-service
 ## <a id="team-contributions"></a>Team Contributions
 
 ### Manav Shah (mdshah5) - CI Pipeline & Security.
-- **40+ hours:** Designed and implemented 7-stage CI pipeline.
-- **15+ hours:** Security scanning (OWASP, Trivy, Hadolint).
-- **12+ hours:** Docker optimization (multi-stage builds, non-root users).
-- **10+ hours:** Ansible roles (common, deploy).
+- Designed and implemented 7-stage CI pipeline.
+- Security scanning (OWASP, Trivy, Hadolint).
+- CD workflows (staging, rollback).
+- Docker optimization (multi-stage builds, non-root users).
+- Ansible roles (common, deploy), playbooks and healthcheck role.
 - **Key Achievement:** 12+ security features, 80% faster builds with caching.
 
 ### Yuvraj Singh Bhatia (ybhatia2) - CD Pipeline & Frontend
-- **35+ hours:** CD workflows (staging, production, rollback).
-- **20+ hours:** Ansible playbooks and healthcheck role.
-- **18+ hours:** Frontend development (HTML/CSS/JS, Nginx).
-- **12+ hours:** Infrastructure setup (VM provisioning, SSH, firewall).
+- CD workflows (production).
+- Frontend development (HTML/CSS/JS, Nginx).
+- Infrastructure setup (VM provisioning, SSH, firewall).
 - **Key Achievement:** Zero-downtime deployments with automated health checks.
 
 **Collaborative Work:**
@@ -1003,15 +626,14 @@ docker exec marketplace-service ping users-service
 
 ---
 
-## <a id="license--contact"></a>📝 License & Contact
+## <a id="license--contact"></a>License & Contact
 
-**Team Contact:**
 - Manav Shah: mdshah5@ncsu.edu
 - Yuvraj Singh Bhatia: ybhatia2@ncsu.edu
 
 ---
 
-## <a id="quick-start-summary"></a>🚀 Quick Start Summary
+## <a id="quick-start-summary"></a>Quick Start Summary
 
 ```bash
 # 1. Clone repository
@@ -1039,10 +661,4 @@ ansible-playbook -i inventory/staging.ini playbooks/deploy_staging.yml
 # 6. Rollback if needed
 ansible-playbook playbooks/rollback.yml -e "target_env=staging"
 ```
-
----
-
-**For detailed pipeline execution logs and workflow runs, visit:**  
-https://github.ncsu.edu/mdshah5/ecocycle-project/actions
-
 ---
