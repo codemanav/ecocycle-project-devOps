@@ -1,18 +1,13 @@
 name: CD Pipeline - Production Deployment
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI Pipeline"]   # Must match name: CI Pipeline
+    types:
+      - completed
     branches:
+      - 'main'
       - 'release/production'
-  workflow_dispatch:
-    inputs:
-      image_tag:
-        description: 'Docker image tag to deploy'
-        required: false
-        default: 'latest'
-      confirm_production:
-        description: 'Type "yes" to confirm production deployment'
-        required: true
 
 env:
   ANSIBLE_HOST: 152.7.176.20
@@ -23,6 +18,11 @@ jobs:
   deploy-production:
     name: Deploy to Production
     runs-on: self-hosted
+    
+    # Only run if CI Pipeline succeeded
+    if: |
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success'
     
     steps:
       - name: Checkout code
@@ -53,7 +53,15 @@ jobs:
       - name: Deploy to Production
         run: |
           cd ansible
-          IMAGE_TAG="${{ github.event.inputs.image_tag || github.event.workflow_run.head_branch || 'latest' }}"
+          
+          # Use 'latest' tag which is built by CI pipeline
+          # CI builds and pushes 'latest' tag on every push to main/release/production
+          IMAGE_TAG="latest"
+          
+          echo "🚀 Deploying to PRODUCTION with image tag: ${IMAGE_TAG}"
+          echo "🌿 Triggered by branch: ${{ github.event.workflow_run.head_branch }}"
+          echo "🔨 Built from commit: ${{ github.event.workflow_run.head_sha }}"
+          
           ansible-playbook -i inventory/production.ini playbooks/deploy_production.yml \
             -e "image_tag=${IMAGE_TAG}" \
             -e "dockerhub_username=${{ env.DOCKERHUB_USERNAME }}" \
