@@ -6,12 +6,10 @@
 
 **Team Members:** Manav Shah (mdshah5) | Yuvraj Singh Bhatia (ybhatia2)  
 
----
 
 ## 📋 Table of Contents
 
 - [Overview](#overview)
-- [Project Structure](#project-structure)
 - [Architecture](#architecture)
 - [CI/CD Pipeline](#cicd-pipeline)
   - [CI Pipeline (7 Stages)](#ci-pipeline-7-stages)
@@ -29,7 +27,6 @@
 - [License & Contact](#license--contact)
 - [Quick Start Summary](#quick-start-summary)
 
----
 
 ## <a id="overview"></a>🎯 Overview
 
@@ -51,152 +48,7 @@ EcoCycle is a **sustainability-focused marketplace platform** with three Spring 
 
 ---
 
-## <a id="project-structure"></a>📁 Project Structure
-
-```
-ecocycle-project/
-├── .github/                          # GitHub Actions workflows
-│   └── workflows/
-│       ├── ci.yml                    # 7-stage CI pipeline
-│       ├── cd_staging.yml            # Staging deployment
-│       └── cd_production.yml         # Production deployment
-│
-├── marketplace-service/              # Marketplace microservice
-│   ├── src/                          # Java source code
-│   │   ├── main/java/com/ecocycle/marketplace/
-│   │   │   ├── controller/          # REST controllers
-│   │   │   │   └── ListingController.java
-│   │   │   ├── dto/                 # Data transfer objects
-│   │   │   │   ├── CreateListingRequest.java
-│   │   │   │   └── ListingDto.java
-│   │   │   ├── model/               # JPA entities
-│   │   │   │   ├── Listing.java
-│   │   │   │   └── ListingType.java (DONATION/SALE)
-│   │   │   ├── repository/          # Data access layer
-│   │   │   │   └── ListingRepository.java
-│   │   │   ├── service/             # Business logic
-│   │   │   │   └── ListingService.java
-│   │   │   └── MarketplaceServiceApplication.java
-│   │   └── resources/
-│   │       ├── application.properties
-│   │       └── application.yml      # Spring Boot config
-│   ├── Dockerfile                   # Multi-stage Docker build
-│   ├── pom.xml                      # Maven dependencies + plugins
-│   └── owasp-suppressions.xml       # CVE suppression rules
-│
-├── users-service/                   # Users microservice
-│   ├── src/
-│   │   ├── main/java/com/ecocycle/users/
-│   │   │   ├── controller/
-│   │   │   │   ├── AuthController.java      # Login/Register
-│   │   │   │   └── UserController.java      # User CRUD
-│   │   │   ├── dto/
-│   │   │   │   ├── CreateUserRequest.java
-│   │   │   │   └── UserDto.java
-│   │   │   ├── model/
-│   │   │   │   └── User.java
-│   │   │   ├── repository/
-│   │   │   │   └── UserRepository.java
-│   │   │   ├── service/
-│   │   │   │   └── UserService.java
-│   │   │   └── UsersServiceApplication.java
-│   │   └── resources/
-│   │       └── application.yml
-│   ├── Dockerfile
-│   ├── pom.xml
-│   └── owasp-suppressions.xml
-│
-├── transactions-service/            # Transactions microservice
-│   ├── src/
-│   │   ├── main/java/com/ecocycle/transactions/
-│   │   │   ├── client/              # Inter-service communication
-│   │   │   │   ├── MarketplaceClient.java
-│   │   │   │   ├── UsersClient.java
-│   │   │   │   └── ListingDto.java
-│   │   │   ├── controller/
-│   │   │   │   └── TransactionController.java
-│   │   │   ├── dto/
-│   │   │   │   ├── ClaimDonationRequest.java
-│   │   │   │   ├── CreateOfferRequest.java
-│   │   │   │   ├── TransactionDto.java
-│   │   │   │   └── UpdateTransactionStatusRequest.java
-│   │   │   ├── model/
-│   │   │   │   ├── Transaction.java
-│   │   │   │   └── TransactionStatus.java (PENDING/COMPLETED/CANCELLED)
-│   │   │   ├── repository/
-│   │   │   │   └── TransactionRepository.java
-│   │   │   ├── service/
-│   │   │   │   └── TransactionService.java
-│   │   │   └── TransactionsServiceApplication.java
-│   │   └── resources/
-│   │       └── application.yml
-│   ├── Dockerfile
-│   ├── pom.xml
-│   └── owasp-suppressions.xml
-│
-├── frontend/                        # Nginx-based web frontend
-│   ├── index.html                   # Main UI page
-│   ├── script.js                    # API calls to backend services
-│   ├── style.css                    # Styling
-│   ├── nginx.conf                   # Nginx reverse proxy config
-│   └── Dockerfile                   # Nginx container
-│
-├── ansible/                         # Infrastructure as Code
-│   ├── ansible.cfg                  # Ansible configuration
-│   ├── inventory/                   # Environment definitions
-│   │   ├── staging.ini              # Staging VM (152.7.176.20:80)
-│   │   └── production.ini           # Production VM (152.7.176.20:8080)
-│   ├── group_vars/
-│   │   └── all/
-│   │       └── vault.yml            # Encrypted secrets (AES256)
-│   ├── playbooks/
-│   │   ├── deploy_staging.yml       # Staging deployment playbook
-│   │   ├── deploy_production.yml    # Production deployment playbook
-│   │   └── rollback.yml             # Rollback playbook
-│   ├── roles/
-│   │   ├── common/                  # VM setup role
-│   │   │   ├── tasks/
-│   │   │   │   └── main.yml         # Docker install, firewall, directories
-│   │   │   └── templates/
-│   │   │       ├── env.j2           # Environment file template
-│   │   │       └── logrotate.j2     # Log rotation config
-│   │   ├── deploy/                  # Deployment role
-│   │   │   ├── tasks/
-│   │   │   │   └── main.yml         # Pull images, deploy compose
-│   │   │   └── templates/
-│   │   │       ├── docker-compose.yml.j2         # Local dev
-│   │   │       ├── docker-compose.staging.yml.j2  # Staging env
-│   │   │       └── docker-compose.prod.yml.j2     # Production env
-│   │   └── healthcheck/             # Health verification role
-│   │       └── tasks/
-│   │           └── main.yml         # Health checks + retry logic
-│   └── README.md                    # Ansible documentation
-│
-├── scripts/                         # Helper scripts
-│   ├── setup-vm.sh                  # VM initial setup script
-│   ├── test-docker-build.sh         # Local Docker build test
-│   ├── test-health-checks.sh        # Health check test script
-│   └── test-local-build.sh          # Local Maven build test
-│
-├── docs/                            # Project documentation
-│   ├── PROJECT_REPORT.md            # Final project report
-│   ├── PIPELINE_DIAGRAMS.md         # Mermaid diagrams
-│   ├── VIDEO_SCRIPT.md              # Demo video script
-│   ├── status_report_1.md           # Sprint 1 status
-│   └── status_report_2.md           # Sprint 2 status
-│
-├── docker-compose.yml               # Local development
-├── docker-compose.staging.yml       # Staging environment
-├── docker-compose.prod.yml          # Production environment
-├── proposal.md                      # Project proposal
-└── .gitignore                       # Git ignore rules
-```
-
----
-
 ## <a id="architecture"></a>🏗️ Architecture
-
-### System Architecture Diagram
 
 ```mermaid
 graph TB
@@ -245,9 +97,7 @@ graph TB
 
 ---
 
-## <a id="cicd-pipeline"></a>🔄 CI/CD Pipeline
-
-### CI/CD Pipeline Flow
+## <a id="cicd-pipeline"></a>CI/CD Pipeline Flow
 
 ```mermaid
 graph LR
@@ -282,10 +132,7 @@ graph LR
 
 ## <a id="ci-pipeline-7-stages"></a>🔧 CI Pipeline (7 Stages)
 
-**Location:** `.github/workflows/ci.yml` (548 lines)
-
 ### Triggers
-
 ```yaml
 # PRs to main/release/develop branches
 pull_request:
@@ -296,250 +143,22 @@ push:
   branches: ['main', 'release/staging', 'release/production']
 ```
 
-### Stage 1: Validation (Lines 32-65)
+1. **Validation** - Checks project structure and caches Maven dependencies (~80% faster builds)
+2. **Code Quality** - Checkstyle enforces Google Java Style Guide
+3. **Unit Tests & Coverage** - JUnit tests with JaCoCo enforcing 50%+ coverage
+4. **Static Analysis** - SpotBugs detects bug patterns (informational, doesn't fail build)
+5. **Security Scanning** - Three layers:
+   - Hadolint scans Dockerfiles for security best practices
+   - OWASP Dependency Check scans Maven dependencies (fails on CVSS ≥ 7)
+   - Trivy scans Docker images for vulnerabilities (fails on CRITICAL/HIGH)
+6. **Build Docker Images** - Multi-stage builds, pushes to Docker Hub with tags (latest, pr-#, sha-, branch)
+7. **Build Summary** - Aggregates results and fails on critical issues
 
-**Purpose:** Verify project structure and cache Maven dependencies
-
-```yaml
-- Cleanup previous build artifacts (sudo rm -rf */target)
-- Checkout code
-- Cache Maven dependencies (~/.m2) → 80% faster builds
-- Verify all service directories exist (marketplace, users, transactions, frontend)
-```
-
-**Key Configuration:**
-- **Cache Key:** `${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}`
-- **Cache Hit Rate:** ~80% on subsequent builds
-
-### Stage 2: Code Quality (Lines 67-124)
-
-**Purpose:** Enforce Google Java Style Guide using Checkstyle
-
-```yaml
-- Run Checkstyle on each service using Dockerized Maven
-  Command: docker run maven:3.9.6-eclipse-temurin-17 mvn checkstyle:check
-- Fail build if style violations found
-- Cleanup Docker-created files (sudo chown)
-```
-
-**Checkstyle Configuration (in pom.xml lines 136-158):**
-```xml
-<plugin>
-  <groupId>org.apache.maven.plugins</groupId>
-  <artifactId>maven-checkstyle-plugin</artifactId>
-  <version>3.3.1</version>
-  <configuration>
-    <configLocation>google_checks.xml</configLocation>
-    <violationSeverity>warning</violationSeverity>
-    <failOnViolation>true</failOnViolation>
-  </configuration>
-</plugin>
-```
-
-### Stage 3: Unit Tests & Coverage (Lines 125-203)
-
-**Purpose:** Run JUnit tests and enforce 50%+ code coverage with JaCoCo
-
-```yaml
-- Test each service: mvn clean test jacoco:report
-- Generate JaCoCo coverage reports (XML + HTML)
-- Upload coverage to Codecov (separate flags: marketplace, users, transactions)
-- Fail if coverage < 50%
-```
-
-**JaCoCo Configuration (pom.xml lines 177-218):**
-```xml
-<plugin>
-  <groupId>org.jacoco</groupId>
-  <artifactId>jacoco-maven-plugin</artifactId>
-  <configuration>
-    <rules>
-      <rule>
-        <element>PACKAGE</element>
-        <limits>
-          <limit>
-            <counter>LINE</counter>
-            <value>COVEREDRATIO</value>
-            <minimum>0.50</minimum>  <!-- 50% minimum -->
-          </limit>
-        </limits>
-      </rule>
-    </rules>
-  </configuration>
-</plugin>
-```
-
-### Stage 4: Static Analysis (Lines 204-260)
-
-**Purpose:** Detect bug patterns and code smells with SpotBugs
-
-```yaml
-- Run SpotBugs on each service: mvn compile spotbugs:check
-- Detect 400+ bug patterns (null pointer, concurrency, security)
-- Continue on error (informational, doesn't fail build)
-```
-
-**SpotBugs Configuration (pom.xml lines 159-176):**
-```xml
-<plugin>
-  <groupId>com.github.spotbugs</groupId>
-  <artifactId>spotbugs-maven-plugin</artifactId>
-  <version>4.8.3.0</version>
-  <configuration>
-    <effort>Max</effort>
-    <threshold>Medium</threshold>
-    <failOnError>false</failOnError>
-  </configuration>
-</plugin>
-```
-
-### Stage 5: Security Scanning (Lines 261-356)
-
-**Purpose:** 3-layer vulnerability scanning (Dependencies, Dockerfiles, Images)
-
-#### 5a. Hadolint - Dockerfile Security (Lines 295-317)
-
-```bash
-# Scans all Dockerfiles for security best practices
-docker run --rm -i hadolint/hadolint < Dockerfile
-
-# Checks:
-# - Pinned versions (FROM maven:3.9.6-eclipse-temurin-17)
-# - Non-root user (USER ecocycle)
-# - Minimal layers (multi-stage builds)
-# - HEALTHCHECK present
-```
-
-**Example Violations:**
-- `FROM maven:latest` → `FROM maven:3.9.6-eclipse-temurin-17`
-- No USER directive → `USER ecocycle`
-
-#### 5b. OWASP Dependency Check (Lines 318-350)
-
-```yaml
-# Scans Maven dependencies against NVD (National Vulnerability Database)
-mvn dependency-check:check
-
-# Configuration (pom.xml lines 234-254):
-<failBuildOnCVSS>7</failBuildOnCVSS>  # Fail on CVSS >= 7 (High/Critical)
-<autoUpdate>false</autoUpdate>         # Use cached NVD data (API rate limits)
-<suppressionFiles>
-  <suppressionFile>owasp-suppressions.xml</suppressionFile>
-</suppressionFiles>
-```
-
-**Suppression Example (owasp-suppressions.xml):**
-```xml
-<!-- Suppress false positives -->
-<suppress>
-   <cve>CVE-2023-20883</cve>  <!-- Spring Boot - fixed in 3.5.6 -->
-</suppress>
-```
-
-**Output:** HTML reports uploaded as artifacts (7-day retention)
-
-#### 5c. Trivy - Container Image Scanning (Lines 446-463)
-
-```yaml
-# Scans Docker images for OS/library vulnerabilities
-aquasecurity/trivy-action@0.20.0
-  image-ref: manavshah13/ecocycle-marketplace-service:latest
-  severity: 'CRITICAL,HIGH'
-  exit-code: '1'  # Fail pipeline on vulnerabilities
-```
-
-### Stage 6: Build Docker Images (Lines 357-463)
-
-**Purpose:** Multi-stage Docker builds and push to Docker Hub
-
-```yaml
-# Matrix strategy - builds 4 services in parallel
-strategy:
-  matrix:
-    service: [marketplace-service, users-service, transactions-service, frontend]
-
-# Steps:
-1. Set up Docker Buildx (layer caching)
-2. Login to Docker Hub (credentials from secrets)
-3. Extract metadata (tags: latest, pr-#, sha-, branch)
-4. Build and push images
-   - Push on: direct pushes + PRs to release/* branches
-   - Skip push on: PRs to main (validation only)
-5. Run Trivy scan on pushed images
-```
-
-**Dockerfile Structure (marketplace-service/Dockerfile):**
-
-```dockerfile
-# Stage 1: Build (maven:3.9.6-eclipse-temurin-17)
-FROM maven:3.9.6-eclipse-temurin-17 AS builder
-WORKDIR /app
-COPY pom.xml .
-RUN mvn dependency:go-offline -B  # Cache dependencies
-COPY src ./src
-RUN mvn clean package -DskipTests -B
-
-# Stage 2: Runtime (eclipse-temurin:17-jre-jammy)
-FROM eclipse-temurin:17-jre-jammy
-RUN groupadd -r ecocycle && useradd -r -g ecocycle ecocycle  # Non-root user
-WORKDIR /app
-COPY --from=builder /app/target/*.jar app.jar
-RUN chown -R ecocycle:ecocycle /app
-USER ecocycle  # Security: run as non-root
-
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8081/actuator/health || exit 1
-
-ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]
-```
-
-**Image Optimization:**
-- **Size Reduction:** 800MB (builder) → 300MB (runtime) = 60% smaller
-- **Security:** No build tools in runtime (Maven, compilers removed)
-- **Caching:** Layer caching via GitHub Actions cache (type=gha)
-
-**Image Tags (Docker Hub: manavshah13/ecocycle-*):**
-- `latest` - Latest build from main/release branches
-- `pr-42` - Pull request #42
-- `sha-abc1234` - Git commit SHA
-- `release-staging` - Release branch name
-
-### Stage 7: Build Summary (Lines 518-548)
-
-**Purpose:** Aggregate results and fail on critical issues
-
-```yaml
-# Job dependencies: needs all previous stages
-needs: [validate, code-quality, test, static-analysis, security-scan, build-images]
-if: always()  # Run even if some jobs fail
-
-# Actions:
-1. Display job results in GitHub Step Summary
-2. Show branch, commit, author info
-3. Fail pipeline if code-quality, test, or static-analysis failed
-4. Cleanup all Docker-created files (final sudo chown)
-```
-
-**Example Summary Output:**
-```
-## CI Pipeline Summary
-
-[OK] Code Quality: success
-[OK] Tests: success
-[OK] Static Analysis: success
-[OK] Security Scan: success
-[OK] Build Images: success
-
-Branch: release/staging
-Commit: abc1234567890
-Author: mdshah5
-```
 
 ---
 
-## <a id="cd-pipeline-staging--production"></a>🚀 CD Pipeline (Staging & Production)
+## <a id="cd-pipeline-staging--production"></a>CD Pipeline (Staging & Production)
 
-### CD Deployment Flow
 
 ```mermaid
 graph TB
@@ -562,8 +181,6 @@ graph TB
 
 ### Staging Deployment
 
-**Location:** `.github/workflows/cd_staging.yml` (84 lines)
-
 **Trigger:**
 ```yaml
 workflow_run:
@@ -575,46 +192,7 @@ workflow_run:
 if: github.event.workflow_run.conclusion == 'success'
 ```
 
-**Steps:**
-1. **Configure SSH** (Lines 43-48)
-   ```yaml
-   - Create ~/.ssh/id_rsa from GitHub Secret
-   - Set permissions to 600 (required by SSH)
-   - Add host to known_hosts (prevent MITM attacks)
-   ```
-
-2. **Install Ansible** (Lines 37-42)
-   ```bash
-   pip install ansible ansible-lint
-   ansible-galaxy collection install community.docker  # Docker Compose v2 support
-   ```
-
-3. **Test Connection** (Lines 50-52)
-   ```bash
-   ansible -i ansible/inventory/staging.ini staging -m ping
-   ```
-
-4. **Deploy** (Lines 54-72)
-   ```bash
-   cd ansible
-   ansible-playbook -i inventory/staging.ini playbooks/deploy_staging.yml \
-     -e "image_tag=latest" \
-     -e "dockerhub_username=manavshah13" \
-     -e "dockerhub_token=${{ secrets.DOCKERHUB_TOKEN }}"
-   ```
-
-5. **Verify** (Lines 73-84)
-   ```
-   Display deployment summary with service URLs:
-   - Frontend: http://152.7.176.20
-   - Marketplace: http://152.7.176.20:8081
-   - Users: http://152.7.176.20:8083
-   - Transactions: http://152.7.176.20:8082
-   ```
-
 ### Production Deployment
-
-**Location:** `.github/workflows/cd_production.yml` (92 lines)
 
 **Trigger:**
 ```yaml
@@ -624,18 +202,12 @@ workflow_run:
   branches: ['main', 'release/production']
 ```
 
-**Differences from Staging:**
-- **Ports:** 8080 (frontend), 9081-9083 (services)
-- **Resource Limits:** CPU/memory caps (docker-compose.prod.yml)
-- **Health Checks:** 15 retries vs 10 (more conservative)
-- **Firewall:** UFW enabled (production only)
-- **Backups:** 30-day retention vs 7-day
-
-**Manual Approval Override:**
-```bash
-# For automated CD (skips confirmation)
--e "manual_approval=false"
-```
+### Deployment Process
+1. Configure SSH using GitHub secrets.
+2. Install Ansible and test connection.
+3. Run Ansible playbook (common role → deploy role → healthcheck role).
+4. Verify all services are healthy.
+5. Rollback if any service fails health checks.
 
 ---
 
@@ -799,246 +371,65 @@ ansible-playbook playbooks/rollback.yml -e "target_env=production"
 
 ---
 
-## <a id="microservices"></a>🧪 Microservices
+## <a id="microservices"></a>Microservices
 
-### 1. Marketplace Service
+**Marketplace Service** - Handles listings (donations/sales). Endpoints: POST/GET/DELETE `/api/listings`
 
-**Location:** `marketplace-service/` (Spring Boot 3.5.6 + PostgreSQL)
+**Users Service** - User management and authentication. Endpoints: POST `/api/auth/register`, POST `/api/auth/login`, CRUD operations on `/api/users`
 
-**Endpoints:**
-```
-POST   /api/listings              # Create listing (donation/sale)
-GET    /api/listings              # Get all listings
-GET    /api/listings/{id}         # Get listing by ID
-GET    /api/listings/type/{type}  # Get by type (DONATION/SALE)
-DELETE /api/listings/{id}         # Delete listing
-GET    /actuator/health           # Health check
-```
+**Transactions Service** - Handles transactions between users. Communicates with Marketplace and Users services via HTTP. Endpoints: POST `/api/transactions/offers`, POST `/api/transactions/claim`, GET/PUT on `/api/transactions`
 
-**Key Classes:**
-- `ListingController.java` - REST endpoints
-- `ListingService.java` - Business logic (create, find, delete)
-- `ListingRepository.java` - JPA repository (extends JpaRepository)
-- `Listing.java` - Entity (id, title, description, price, type, userId, createdAt)
-- `ListingType.java` - Enum (DONATION, SALE)
+**Frontend** - Nginx reverse proxy serving static HTML/JS/CSS and proxying API calls to backend services
 
-**Dependencies (pom.xml):**
-```xml
-- spring-boot-starter-web (REST API)
-- spring-boot-starter-data-jpa (Database access)
-- spring-boot-starter-actuator (Health checks, metrics)
-- spring-boot-starter-validation (Input validation)
-- postgresql (Database driver)
-- springdoc-openapi-starter-webmvc-ui (Swagger/OpenAPI 3.0)
-- lombok (Reduce boilerplate)
-```
-
-**Database:** PostgreSQL 16, Port 5433 (local), Database: `marketplace`
-
-### 2. Users Service
-
-**Location:** `users-service/` (Spring Boot 3.5.6 + PostgreSQL)
-
-**Endpoints:**
-```
-POST   /api/auth/register         # Register new user
-POST   /api/auth/login            # Login (returns user ID)
-GET    /api/users                 # Get all users
-GET    /api/users/{id}            # Get user by ID
-GET    /api/users/email/{email}   # Get user by email
-PUT    /api/users/{id}            # Update user
-DELETE /api/users/{id}            # Delete user
-GET    /actuator/health           # Health check
-```
-
-**Key Classes:**
-- `AuthController.java` - Registration and login
-- `UserController.java` - User CRUD operations
-- `UserService.java` - Business logic (register, login, findByEmail)
-- `UserRepository.java` - JPA repository
-- `User.java` - Entity (id, username, email, createdAt)
-
-**Database:** PostgreSQL 16, Port 5435 (local), Database: `users`
-
-### 3. Transactions Service
-
-**Location:** `transactions-service/` (Spring Boot 3.5.6 + PostgreSQL)
-
-**Endpoints:**
-```
-POST   /api/transactions/offers             # Create purchase offer
-POST   /api/transactions/claim              # Claim donation
-GET    /api/transactions                    # Get all transactions
-GET    /api/transactions/{id}               # Get transaction by ID
-GET    /api/transactions/user/{userId}      # Get user's transactions
-GET    /api/transactions/listing/{listingId}# Get listing's transactions
-PUT    /api/transactions/{id}/status        # Update status (COMPLETED/CANCELLED)
-GET    /actuator/health                     # Health check
-```
-
-**Key Classes:**
-- `TransactionController.java` - REST endpoints
-- `TransactionService.java` - Business logic + inter-service calls
-- `TransactionRepository.java` - JPA repository
-- `Transaction.java` - Entity (id, listingId, buyerId, sellerId, amount, status, createdAt)
-- `TransactionStatus.java` - Enum (PENDING, COMPLETED, CANCELLED)
-- `MarketplaceClient.java` - HTTP client to Marketplace service
-- `UsersClient.java` - HTTP client to Users service
-
-**Inter-Service Communication:**
-```java
-// MarketplaceClient.java - Fetches listing details
-@Value("${marketplace.base-url}")
-private String marketplaceBaseUrl;
-
-public ListingDto getListingById(Long listingId) {
-    String url = marketplaceBaseUrl + "/api/listings/" + listingId;
-    return restTemplate.getForObject(url, ListingDto.class);
-}
-
-// Configuration (application.yml)
-marketplace:
-  base-url: http://marketplace:8081  # Docker internal network
-```
-
-**Database:** PostgreSQL 16, Port 5434 (local), Database: `transactions`
-
-### 4. Frontend
-
-**Location:** `frontend/` (Nginx 1.25 + Vanilla JavaScript)
-
-**Files:**
-- `index.html` - Main UI (login, register, service buttons)
-- `script.js` - API calls to backend services
-- `style.css` - Styling
-- `nginx.conf` - Reverse proxy configuration
-
-**Nginx Configuration (`nginx.conf`):**
-```nginx
-server {
-    listen 80;
-    server_name localhost;
-    
-    # Serve static frontend
-    location / {
-        root /usr/share/nginx/html;
-        index index.html;
-        try_files $uri $uri/ /index.html;
-    }
-    
-    # Reverse proxy to backend services
-    location /api/users {
-        proxy_pass http://users:8083;
-    }
-    
-    location /api/marketplace {
-        proxy_pass http://marketplace:8081;
-    }
-    
-    location /api/transactions {
-        proxy_pass http://transactions:8082;
-    }
-    
-    # Health check endpoint
-    location /health {
-        access_log off;
-        return 200 "healthy\n";
-        add_header Content-Type text/plain;
-    }
-}
-```
-
-**API Calls (script.js):**
-```javascript
-async function callService(service) {
-  const apiEndpoints = {
-    users: '/api/users',
-    marketplace: '/api/listings',
-    transactions: '/api/transactions'
-  };
-  
-  const response = await fetch(apiEndpoints[service]);
-  const data = await response.json();
-  document.getElementById('result').textContent = JSON.stringify(data, null, 2);
-}
-```
+All services use Spring Boot Actuator for health checks at `/actuator/health`.
 
 ---
 
-## <a id="security-implementation"></a>🔒 Security Implementation
+## <a id="security-implementation"></a>Security Implementation
 
 ### 1. Vulnerability Scanning (3 Layers)
 
 #### Layer 1: OWASP Dependency Check
 - **What:** Scans Maven dependencies against NVD (50,000+ CVEs)
-- **Where:** `.github/workflows/ci.yml` lines 318-350, `pom.xml` lines 234-254
+- **Where:** `.github/workflows/ci.yml`, `pom.xml`
 - **Threshold:** CVSS ≥ 7 fails build
 - **Example:** Detected outdated Spring Boot with CVE-2023-20883 → upgraded to 3.5.6
 
 #### Layer 2: Hadolint Dockerfile Linting
 - **What:** Static analysis of Dockerfiles for security best practices
-- **Where:** `.github/workflows/ci.yml` lines 295-317
+- **Where:** `.github/workflows/ci.yml`
 - **Checks:** Pinned versions, non-root user, minimal layers, no secrets in ENV
 - **Example:** Enforced `USER ecocycle` in all service Dockerfiles
 
 #### Layer 3: Trivy Image Scanning
 - **What:** Scans Docker images for OS/library vulnerabilities
-- **Where:** `.github/workflows/ci.yml` lines 446-463
+- **Where:** `.github/workflows/ci.yml`
 - **Severity:** CRITICAL + HIGH (exit-code: 1)
 - **Example:** Caught vulnerable OpenSSL in base image → switched to patched image
 
 ### 2. Container Hardening
 
-#### Non-Root User (All Dockerfiles lines 30-42)
-```dockerfile
-RUN groupadd -r ecocycle && useradd -r -g ecocycle ecocycle
-USER ecocycle
-```
 - **Why:** Limits blast radius if container compromised
 - **Impact:** Attacker has no root privileges even if shell access gained
 
 #### Multi-Stage Builds
-```dockerfile
-FROM maven:3.9.6-eclipse-temurin-17 AS builder  # Build stage
-FROM eclipse-temurin:17-jre-jammy                # Runtime stage
-```
 - **Why:** Excludes build tools from runtime (60% smaller: 800MB → 300MB)
 - **Impact:** Fewer binaries = smaller attack surface
 
-#### Health Checks (All Dockerfiles lines 48-49)
-```dockerfile
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-    CMD wget --spider http://localhost:8081/actuator/health || exit 1
-```
+#### Health Checks (All Dockerfiles)
 - **Why:** Docker/Ansible can detect unhealthy containers automatically
 - **Impact:** Prevents deploying broken services
 
 ### 3. Secrets Management
 
-#### GitHub Secrets (`.github/workflows/*.yml`)
-```yaml
-${{ secrets.DOCKERHUB_TOKEN }}         # Docker Hub access
-${{ secrets.ANSIBLE_SSH_PRIVATE_KEY }} # SSH key for deployment
-${{ secrets.ANSIBLE_VAULT_PASSWORD }}  # Ansible Vault decryption key
-```
-- **Encryption:** AES256 at rest
-- **Masking:** Auto-redacted in logs (`***`)
+#### GitHub Secrets
+- **Encryption:** AES256 at rest.
 
-#### Ansible Vault (`ansible/group_vars/all/vault.yml`)
-```bash
-# Encrypted file
-$ANSIBLE_VAULT;1.1;AES256
-3339643935363538353...
+#### Ansible Vault
+- **Algorithm:** AES256 Encryption.
+- **Access control:** Only CI/CD takes the vault password from github secrets.
 
-# Decrypt
-ansible-vault view vault.yml
-vault_db_password: SecurePassword123!
-```
-- **Algorithm:** AES256
-- **Safe to commit:** Yes, encrypted in repo
-- **Access control:** Only CI/CD has vault password
-
-#### Credential Masking (`ansible/roles/deploy/tasks/main.yml` line 10)
+#### Credential Masking (`ansible/roles/deploy/tasks/main.yml`)
 ```yaml
 - name: Login to Docker Hub
   docker_login:
@@ -1051,8 +442,7 @@ vault_db_password: SecurePassword123!
 
 #### UFW Firewall (Production Only)
 ```yaml
-# ansible/roles/common/tasks/main.yml lines 104-128
-- name: Configure UFW
+# ansible/roles/common/tasks/main.yml
   ufw:
     rule: allow
     port: "{{ item }}"
@@ -1068,7 +458,7 @@ vault_db_password: SecurePassword123!
 - **Allowed:** Only SSH + application ports
 - **Impact:** Prevents unauthorized port scanning
 
-#### SSH Hardening (`.github/workflows/cd_*.yml` lines 43-48)
+#### SSH Hardening (`.github/workflows/cd_*.yml`)
 ```yaml
 - name: Configure SSH
   run: |
@@ -1108,16 +498,16 @@ services:
 
 | Feature | Location | Impact |
 |---------|----------|--------|
-| OWASP Dependency Check | CI line 318-350, pom.xml 234-254 | Blocks vulnerable libraries |
-| Trivy Image Scanning | CI line 446-463 | Blocks vulnerable images |
-| Hadolint | CI line 295-317 | Enforces Dockerfile best practices |
-| Non-Root Containers | All Dockerfiles line 30-42 | Limits privilege escalation |
+| OWASP Dependency Check | CI , pom.xml  | Blocks vulnerable libraries |
+| Trivy Image Scanning | CI  | Blocks vulnerable images |
+| Hadolint | CI | Enforces Dockerfile best practices |
+| Non-Root Containers | All Dockerfiles | Limits privilege escalation |
 | Multi-Stage Builds | All Dockerfiles | 60% smaller attack surface |
 | GitHub Secrets | All workflows | Encrypted credentials |
 | Ansible Vault | ansible/group_vars/all/vault.yml | AES256 encrypted passwords |
-| Credential Masking | ansible/roles/deploy line 10 | Prevents log leakage |
-| UFW Firewall | ansible/roles/common line 104-128 | Port restriction |
-| SSH Key Auth | CD workflows line 43-48 | 600 perms, MITM protection |
+| Credential Masking | ansible/roles/deploy | Prevents log leakage |
+| UFW Firewall | ansible/roles/common | Port restriction |
+| SSH Key Auth | CD workflows | 600 perms, MITM protection |
 | Resource Limits | docker-compose.prod.yml | DoS prevention |
 | File Permissions | ansible/roles/common | 0600 for sensitive files |
 
@@ -1281,7 +671,7 @@ transactions-service/src/test/java/
 
 ### Integration Tests
 
-**Location:** `.github/workflows/ci.yml` lines 466-517
+**Location:** `.github/workflows/ci.yml` 
 
 ```yaml
 # Runs after Docker builds
@@ -1322,12 +712,12 @@ echo "[OK] All health checks passed"
 
 | Gate | Tool | Threshold | Location |
 |------|------|-----------|----------|
-| **Code Style** | Checkstyle | 0 violations | CI lines 101-117, pom.xml 136-158 |
-| **Code Coverage** | JaCoCo | 50% minimum | CI lines 158-169, pom.xml 177-218 |
-| **Bug Detection** | SpotBugs | Medium+ bugs | CI lines 238-252, pom.xml 159-176 |
-| **Dependency CVEs** | OWASP | CVSS < 7 | CI lines 318-334, pom.xml 234-254 |
-| **Dockerfile Security** | Hadolint | 0 critical issues | CI lines 295-317 |
-| **Image Vulnerabilities** | Trivy | 0 CRITICAL/HIGH | CI lines 446-463 |
+| **Code Style** | Checkstyle | 0 violations | CI, pom.xml  |
+| **Code Coverage** | JaCoCo | 50% minimum | CI, pom.xml  |
+| **Bug Detection** | SpotBugs | Medium+ bugs | CI , pom.xml  |
+| **Dependency CVEs** | OWASP | CVSS < 7 | CI , pom.xml  |
+| **Dockerfile Security** | Hadolint | 0 critical issues | CI |
+| **Image Vulnerabilities** | Trivy | 0 CRITICAL/HIGH | CI |
 | **Health Checks** | Ansible | All services UP | ansible/roles/healthcheck |
 
 ---
@@ -1376,7 +766,7 @@ management:
 
 ### Docker Health Checks
 
-**Configuration:** All service Dockerfiles lines 48-49
+**Configuration:** All service Dockerfiles
 
 ```dockerfile
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
@@ -1588,21 +978,21 @@ docker exec marketplace-service ping users-service
 
 ---
 
-## <a id="team-contributions"></a>👥 Team Contributions
+## <a id="team-contributions"></a>Team Contributions
 
-### Manav Shah (mdshah5) - CI Pipeline & Security
-- **40+ hours:** Designed and implemented 7-stage CI pipeline
-- **15+ hours:** Security scanning (OWASP, Trivy, Hadolint)
-- **12+ hours:** Docker optimization (multi-stage builds, non-root users)
-- **10+ hours:** Ansible roles (common, deploy)
-- **Key Achievement:** 12+ security features, 80% faster builds with caching
+### Manav Shah (mdshah5) - CI Pipeline & Security.
+- **40+ hours:** Designed and implemented 7-stage CI pipeline.
+- **15+ hours:** Security scanning (OWASP, Trivy, Hadolint).
+- **12+ hours:** Docker optimization (multi-stage builds, non-root users).
+- **10+ hours:** Ansible roles (common, deploy).
+- **Key Achievement:** 12+ security features, 80% faster builds with caching.
 
 ### Yuvraj Singh Bhatia (ybhatia2) - CD Pipeline & Frontend
-- **35+ hours:** CD workflows (staging, production, rollback)
-- **20+ hours:** Ansible playbooks and healthcheck role
-- **18+ hours:** Frontend development (HTML/CSS/JS, Nginx)
-- **12+ hours:** Infrastructure setup (VM provisioning, SSH, firewall)
-- **Key Achievement:** Zero-downtime deployments with automated health checks
+- **35+ hours:** CD workflows (staging, production, rollback).
+- **20+ hours:** Ansible playbooks and healthcheck role.
+- **18+ hours:** Frontend development (HTML/CSS/JS, Nginx).
+- **12+ hours:** Infrastructure setup (VM provisioning, SSH, firewall).
+- **Key Achievement:** Zero-downtime deployments with automated health checks.
 
 **Collaborative Work:**
 - Architecture design and technology selection
