@@ -7,7 +7,7 @@
 **Team Members:** Manav Shah (mdshah5) | Yuvraj Singh Bhatia (ybhatia2)  
 
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Overview](#overview)
 - [Architecture](#architecture)
@@ -20,9 +20,8 @@
 - [Setup & Deployment](#setup--deployment)
 - [Testing & Quality Gates](#testing--quality-gates)
 - [Monitoring & Health Checks](#monitoring--health-checks)
-- [Troubleshooting](#troubleshooting)
 - [Documentation](#documentation)
-- [Learning Resources](#learning-resources)
+- [Learning](#learning-resources)
 - [Team Contributions](#team-contributions)
 - [License & Contact](#license--contact)
 - [Quick Start Summary](#quick-start-summary)
@@ -45,8 +44,6 @@ EcoCycle is a **sustainability-focused marketplace platform** with three Spring 
 - **Security**: Multi-layer vulnerability scanning, non-root containers, encrypted secrets, firewall rules
 - **Reliability**: Automated health checks with rollback on failure
 - **Reproducibility**: Complete Infrastructure as Code with Ansible
-
----
 
 ## <a id="architecture"></a>Architecture
 
@@ -95,8 +92,6 @@ graph TB
 | **Staging** | 152.7.176.20 | Frontend: 80, Services: 8081-8083 | Pre-production testing |
 | **Production** | 152.7.176.20 | Frontend: 8080, Services: 9081-9083 | Production deployment |
 
----
-
 ## <a id="cicd-pipeline"></a>CI/CD Pipeline Flow
 
 ```mermaid
@@ -128,8 +123,6 @@ graph LR
     style P fill:#d4edda
 ```
 
----
-
 ## <a id="ci-pipeline-7-stages"></a>🔧 CI Pipeline (7 Stages)
 
 ### Triggers
@@ -154,8 +147,6 @@ push:
 6. **Build Docker Images** - Multi-stage builds, pushes to Docker Hub with tags (latest, pr-#, sha-, branch)
 7. **Build Summary** - Aggregates results and fails on critical issues
 
-
----
 
 ## <a id="cd-pipeline-staging--production"></a>CD Pipeline (Staging & Production)
 
@@ -345,7 +336,6 @@ services:
 | Resource Limits | docker-compose.prod.yml | DoS prevention |
 | File Permissions | ansible/roles/common | 0600 for sensitive files |
 
----
 
 ## <a id="setup--deployment"></a>Setup & Deployment
 
@@ -510,8 +500,6 @@ echo "[OK] All health checks passed"
 | **Image Vulnerabilities** | Trivy | 0 CRITICAL/HIGH | CI |
 | **Health Checks** | Ansible | All services UP | ansible/roles/healthcheck |
 
----
-
 ## <a id="monitoring--health-checks"></a>Monitoring & Health Checks
 
 ### Spring Boot Actuator
@@ -571,8 +559,6 @@ management:
    - Application deployment (deploy)
    - Health verification (healthcheck)
 
----
-
 ## <a id="learning-resources"></a>Learning
 
 ### DevOps Concepts Implemented
@@ -599,8 +585,6 @@ management:
 | **Monitoring** | Spring Boot Actuator |
 | **Secrets** | GitHub Secrets, Ansible Vault |
 
----
-
 ## <a id="team-contributions"></a>Team Contributions
 
 ### Manav Shah (mdshah5) - CI Pipeline & Security.
@@ -624,14 +608,11 @@ management:
 - End-to-end testing and validation
 - Documentation and reporting
 
----
-
 ## <a id="license--contact"></a>License & Contact
 
 - Manav Shah: mdshah5@ncsu.edu
 - Yuvraj Singh Bhatia: ybhatia2@ncsu.edu
 
----
 
 ## <a id="quick-start-summary"></a>Quick Start Summary
 
@@ -661,4 +642,3 @@ ansible-playbook -i inventory/staging.ini playbooks/deploy_staging.yml
 # 6. Rollback if needed
 ansible-playbook playbooks/rollback.yml -e "target_env=staging"
 ```
----
