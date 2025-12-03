@@ -1,0 +1,184 @@
+version: "3.9"
+
+services:
+  # Marketplace Service
+  marketplace:
+    image: {{ dockerhub_username }}/ecocycle-marketplace-service:{{ image_tag }}
+    container_name: marketplace-service-{{ env_name }}
+    restart: unless-stopped
+    ports:
+      - "{{ marketplace_port }}:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: {{ env_name }}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://marketplace-db:5432/marketplace
+      SPRING_DATASOURCE_USERNAME: {{ db_username }}
+      SPRING_DATASOURCE_PASSWORD: {{ db_password }}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      LOGGING_LEVEL_ROOT: INFO
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
+    depends_on:
+      marketplace-db:
+        condition: service_healthy
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  marketplace-db:
+    image: postgres:16-alpine
+    container_name: marketplace-db-{{ env_name }}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: marketplace
+      POSTGRES_USER: {{ db_username }}
+      POSTGRES_PASSWORD: {{ db_password }}
+    volumes:
+      - marketplace-db-data:/var/lib/postgresql/data
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ db_username }}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Transactions Service
+  transactions:
+    image: {{ dockerhub_username }}/ecocycle-transactions-service:{{ image_tag }}
+    container_name: transactions-service-{{ env_name }}
+    restart: unless-stopped
+    ports:
+      - "{{ transactions_port }}:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: {{ env_name }}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://transactions-db:5432/transactions
+      SPRING_DATASOURCE_USERNAME: {{ db_username }}
+      SPRING_DATASOURCE_PASSWORD: {{ db_password }}
+      MARKETPLACE_BASE_URL: http://marketplace:8081
+      USERS_BASE_URL: http://users:8083
+      LOGGING_LEVEL_ROOT: INFO
+    depends_on:
+      transactions-db:
+        condition: service_healthy
+      marketplace:
+        condition: service_healthy
+      users:
+        condition: service_healthy
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  transactions-db:
+    image: postgres:16-alpine
+    container_name: transactions-db-{{ env_name }}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: transactions
+      POSTGRES_USER: {{ db_username }}
+      POSTGRES_PASSWORD: {{ db_password }}
+    volumes:
+      - transactions-db-data:/var/lib/postgresql/data
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ db_username }}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Users Service
+  users:
+    image: {{ dockerhub_username }}/ecocycle-users-service:{{ image_tag }}
+    container_name: users-service-{{ env_name }}
+    restart: unless-stopped
+    ports:
+      - "{{ users_port }}:8083"
+    environment:
+      SPRING_PROFILES_ACTIVE: {{ env_name }}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://users-db:5432/users
+      SPRING_DATASOURCE_USERNAME: {{ db_username }}
+      SPRING_DATASOURCE_PASSWORD: {{ db_password }}
+      LOGGING_LEVEL_ROOT: INFO
+    depends_on:
+      users-db:
+        condition: service_healthy
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  users-db:
+    image: postgres:16-alpine
+    container_name: users-db-{{ env_name }}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: users
+      POSTGRES_USER: {{ db_username }}
+      POSTGRES_PASSWORD: {{ db_password }}
+    volumes:
+      - users-db-data:/var/lib/postgresql/data
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ db_username }}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Frontend Service
+  frontend:
+    image: {{ dockerhub_username }}/ecocycle-frontend:{{ image_tag }}
+    container_name: frontend-{{ env_name }}
+    restart: always
+    ports:
+      - "{{ frontend_port }}:80"
+    depends_on:
+      - marketplace
+      - users
+      - transactions
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+networks:
+  ecocycle-network:
+    driver: bridge
+    name: ecocycle-{{ env_name }}-network
+
+volumes:
+  marketplace-db-data:
+    name: marketplace-db-{{ env_name }}-data
+  transactions-db-data:
+    name: transactions-db-{{ env_name }}-data
+  users-db-data:
+    name: users-db-{{ env_name }}-data
+
+

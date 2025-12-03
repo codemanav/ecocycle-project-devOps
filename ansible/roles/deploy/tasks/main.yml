@@ -1,0 +1,47 @@
+---
+# Deploy role - Handles application deployment
+
+- name: Login to Docker Hub
+  docker_login:
+    registry: "{{ docker_registry }}"
+    username: "{{ dockerhub_username }}"
+    password: "{{ dockerhub_token }}"
+  when: dockerhub_token is defined
+  no_log: true
+
+- name: Copy docker-compose file to server
+  template:
+    src: "{{ compose_file }}.j2"
+    dest: "{{ app_dir }}/{{ compose_file }}"
+    owner: "{{ deploy_user }}"
+    mode: '0644'
+    force: yes
+
+- name: Remove any existing containers for this environment only (safe cleanup)
+  shell: |
+    docker rm -f \
+      marketplace-service-{{ env_name }} \
+      transactions-service-{{ env_name }} \
+      users-service-{{ env_name }} \
+      marketplace-db-{{ env_name }} \
+      transactions-db-{{ env_name }} \
+      users-db-{{ env_name }} \
+      frontend-{{ env_name }} || true
+  changed_when: false
+
+- name: Deploy services (pull, stop, start)
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}"
+    files:
+      - "{{ compose_file }}"
+    state: present
+    pull: always
+    recreate: always
+  environment:
+    DOCKERHUB_USERNAME: "{{ dockerhub_username }}"
+    IMAGE_TAG: "{{ image_tag }}"
+
+- name: Wait for services to be ready
+  pause:
+    seconds: "{{ health_check_delay }}"
+

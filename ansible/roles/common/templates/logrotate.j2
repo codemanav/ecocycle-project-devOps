@@ -1,0 +1,14 @@
+{{ app_dir }}/logs/*.log {
+    daily
+    missingok
+    rotate 14
+    compress
+    delaycompress
+    notifempty
+    create 0640 {{ deploy_user }} {{ deploy_user }}
+    sharedscripts
+    postrotate
+        docker-compose -f {{ app_dir }}/{{ compose_file }} restart > /dev/null 2>&1 || true
+    endscript
+}
+

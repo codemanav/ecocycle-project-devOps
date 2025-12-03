@@ -1,0 +1,82 @@
+---
+# Deploy to Production Environment
+- name: Deploy EcoCycle to Production
+  hosts: production
+  gather_facts: yes
+  
+  pre_tasks:
+    - name: Display deployment information
+      debug:
+        msg:
+          - "========================================="
+          - "PRODUCTION DEPLOYMENT"
+          - "========================================="
+          - "Target host: {{ ansible_host }}"
+          - "Image tag: {{ image_tag }}"
+          - "Deploy user: {{ deploy_user }}"
+    
+    - name: Confirm production deployment
+      pause:
+        prompt: "Deploy to PRODUCTION? Type 'yes' to continue"
+      register: confirm_deploy
+      when: (manual_approval | default(true)) | bool
+    
+    - name: Abort if not confirmed
+      fail:
+        msg: "Deployment cancelled"
+      when: 
+        - (manual_approval | default(true)) | bool
+        - confirm_deploy.user_input != "yes"
+    
+    - name: Check if host is reachable
+      ping:
+  
+  roles:
+    - role: common
+      tags: ['setup', 'common']
+    
+    - role: deploy
+      tags: ['deploy']
+    
+    - role: healthcheck
+      tags: ['healthcheck', 'verify']
+  
+  post_tasks:
+    - name: Run smoke tests for backend services
+      uri:
+        url: "http://{{ ansible_host }}:{{ item }}/actuator/health"
+        method: GET
+        status_code: 200
+      loop:
+        - "{{ marketplace_port }}"
+        - "{{ users_port }}"
+        - "{{ transactions_port }}"
+      register: smoke_tests
+    
+    - name: Run smoke test for frontend
+      uri:
+        url: "http://{{ ansible_host }}:{{ frontend_port }}/health"
+        method: GET
+        status_code: 200
+      register: frontend_smoke_test
+    
+    - name: Display deployment summary
+      debug:
+        msg:
+          - "========================================="
+          - "PRODUCTION Deployment Completed!"
+          - "========================================="
+          - "Deployed at: {{ ansible_date_time.iso8601 }}"
+          - ""
+          - "Services:"
+          - "  - Frontend: http://{{ ansible_host }}:{{ frontend_port }}"
+          - "  - Marketplace: http://{{ ansible_host }}:{{ marketplace_port }}"
+          - "  - Users: http://{{ ansible_host }}:{{ users_port }}"
+          - "  - Transactions: http://{{ ansible_host }}:{{ transactions_port }}"
+          - ""
+          - "All smoke tests passed: {{ (smoke_tests.results | map(attribute='status') | list | unique == [200]) and (frontend_smoke_test.status == 200) }}"
+    
+    - name: Send production deployment notification
+      debug:
+        msg: "PRODUCTION deployment completed successfully at {{ ansible_date_time.iso8601 }}"
+

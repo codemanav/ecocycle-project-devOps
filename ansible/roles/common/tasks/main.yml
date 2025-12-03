@@ -1,0 +1,142 @@
+---
+# Common role - Sets up the VM with all required dependencies
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  become: yes
+
+- name: Install required system packages
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - python3
+      - python3-pip
+      - git
+    state: present
+  become: yes
+
+- name: Check if Docker is already installed
+  command: docker --version
+  register: docker_check
+  changed_when: false
+  failed_when: false
+  become: yes
+
+- name: Install Docker using official script (if not installed)
+  shell: |
+    curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+    sh /tmp/get-docker.sh
+    rm /tmp/get-docker.sh
+  become: yes
+  when: docker_check.rc != 0
+  args:
+    creates: /usr/bin/docker
+
+- name: Install Docker
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: yes
+  become: yes
+
+- name: Ensure Docker service is started and enabled
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+  become: yes
+
+- name: Add deploy user to docker group
+  user:
+    name: "{{ deploy_user }}"
+    groups: docker
+    append: yes
+  become: yes
+
+- name: Create application directory
+  file:
+    path: "{{ app_dir }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    mode: '0755'
+
+- name: Create backup directories
+  file:
+    path: "{{ backup_dir }}/{{ item }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    mode: '0755'
+  loop:
+    - marketplace
+    - transactions
+    - users
+
+- name: Create logs directory
+  file:
+    path: "{{ app_dir }}/logs"
+    state: directory
+    owner: "{{ deploy_user }}"
+    mode: '0755'
+
+- name: Check if Python Docker SDK is installed
+  command: python3 -c "import docker"
+  register: docker_sdk_check
+  changed_when: false
+  failed_when: false
+  become: yes
+
+- name: Install Python Docker SDK (for Ansible docker modules)
+  command: pip3 install --break-system-packages docker
+  become: yes
+  when: docker_sdk_check.rc != 0
+
+- name: Configure firewall - Allow SSH
+  ufw:
+    rule: allow
+    port: '22'
+    proto: tcp
+  become: yes
+
+- name: Configure firewall - Allow application ports
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  become: yes
+  loop:
+    - "{{ marketplace_port }}"
+    - "{{ transactions_port }}"
+    - "{{ users_port }}"
+
+- name: Enable firewall
+  ufw:
+    state: enabled
+  become: yes
+
+- name: Create environment file
+  template:
+    src: env.j2
+    dest: "{{ app_dir }}/.env"
+    owner: "{{ deploy_user }}"
+    mode: '0600'
+
+- name: Setup log rotation
+  template:
+    src: logrotate.j2
+    dest: /etc/logrotate.d/ecocycle
+    owner: root
+    group: root
+    mode: '0644'
+  become: yes
+

@@ -1,0 +1,62 @@
+---
+# Health check role - Verifies all services are healthy
+
+- name: Check backend service health
+  uri:
+    url: "http://{{ ansible_host }}:{{ item.port }}/actuator/health"
+    method: GET
+    status_code: 200
+    timeout: "{{ health_check_timeout }}"
+  register: health_results
+  retries: "{{ health_check_retries }}"
+  delay: "{{ health_check_delay }}"
+  until: health_results.status == 200
+  failed_when: false
+  loop:
+    - { name: "Marketplace", port: "{{ marketplace_port }}" }
+    - { name: "Users", port: "{{ users_port }}" }
+    - { name: "Transactions", port: "{{ transactions_port }}" }
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Check frontend health
+  uri:
+    url: "http://{{ ansible_host }}:{{ frontend_port | default(80) }}/health"
+    method: GET
+    status_code: 200
+    timeout: "{{ health_check_timeout }}"
+  register: frontend_health
+  retries: "{{ health_check_retries }}"
+  delay: "{{ health_check_delay }}"
+  until: frontend_health.status == 200
+  failed_when: false
+
+- name: Display backend health check results
+  debug:
+    msg: "{{ item.item.name }} Service: {{ 'HEALTHY' if item.status == 200 else 'UNHEALTHY' }}"
+  loop: "{{ health_results.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Display frontend health check result
+  debug:
+    msg: "Frontend: {{ 'HEALTHY' if (frontend_health is defined and frontend_health.status == 200) else 'UNHEALTHY' }}"
+
+- name: Check if all services are healthy
+  set_fact:
+    all_healthy: "{{ (health_results.results | map(attribute='status') | list | select('equalto', 200) | list | length == 3) and (frontend_health is defined and frontend_health.status == 200) }}"
+
+- name: Fail if any service is unhealthy
+  fail:
+    msg: "Health check failed! One or more services are not healthy."
+  when: not all_healthy
+
+- name: Get container status
+  command: docker compose -f {{ app_dir }}/{{ compose_file }} ps
+  register: container_status
+  changed_when: false
+
+- name: Display container status
+  debug:
+    msg: "{{ container_status.stdout_lines }}"
+

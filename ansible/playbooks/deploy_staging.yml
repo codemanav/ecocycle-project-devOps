@@ -1,0 +1,51 @@
+---
+# Deploy to Staging Environment
+- name: Deploy EcoCycle to Staging
+  hosts: staging
+  gather_facts: yes
+  
+  pre_tasks:
+    - name: Display deployment information
+      debug:
+        msg:
+          - "Deploying to: {{ env_name }}"
+          - "Target host: {{ ansible_host }}"
+          - "Image tag: {{ image_tag }}"
+          - "Deploy user: {{ deploy_user }}"
+    
+    - name: Check if host is reachable
+      ping:
+  
+  roles:
+    - role: common
+      tags: ['setup', 'common']
+    
+    - role: deploy
+      tags: ['deploy']
+    
+    - role: healthcheck
+      tags: ['healthcheck', 'verify']
+  
+  post_tasks:
+    - name: Display deployment summary
+      debug:
+        msg:
+          - "========================================="
+          - "Deployment to {{ env_name }} completed!"
+          - "========================================="
+          - "Services:"
+          - "  - Frontend: http://{{ ansible_host }}:{{ frontend_port }}"
+          - "  - Marketplace: http://{{ ansible_host }}:{{ marketplace_port }}"
+          - "  - Users: http://{{ ansible_host }}:{{ users_port }}"
+          - "  - Transactions: http://{{ ansible_host }}:{{ transactions_port }}"
+          - ""
+          - "Health Check:"
+          - "  - Frontend: http://{{ ansible_host }}:{{ frontend_port }}/health"
+          - "  - Marketplace: http://{{ ansible_host }}:{{ marketplace_port }}/actuator/health"
+          - "  - Users: http://{{ ansible_host }}:{{ users_port }}/actuator/health"
+          - "  - Transactions: http://{{ ansible_host }}:{{ transactions_port }}/actuator/health"
+    
+    - name: Send deployment notification
+      debug:
+        msg: "Deployment completed successfully at {{ ansible_date_time.iso8601 }}"
+

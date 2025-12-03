@@ -19,7 +19,3 @@ marketplace:
 
 users:
   base-url: http://localhost:8083
-
-jwt:
-  secret: my-super-long-secret-key-ecocycle-123456789   # keep same across services
-  expiration: 86400000   # 1 day in ms

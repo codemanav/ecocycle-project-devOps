@@ -1,0 +1,228 @@
+version: "3.9"
+
+services:
+  # =======================
+  # Marketplace Service
+  # =======================
+  marketplace:
+    image: ghcr.github.ncsu.edu/${GITHUB_REPOSITORY_OWNER}/ecocycle-marketplace-service:${IMAGE_TAG:-latest}
+    container_name: marketplace-service-staging
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: staging
+      SPRING_DATASOURCE_URL: jdbc:postgresql://marketplace-db:5432/marketplace
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-ecocycle}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-ecocycle}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      LOGGING_LEVEL_ROOT: INFO
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
+    depends_on:
+      marketplace-db:
+        condition: service_healthy
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  marketplace-db:
+    image: postgres:16-alpine
+    container_name: marketplace-db-staging
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: marketplace
+      POSTGRES_USER: ${DB_USERNAME:-ecocycle}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ecocycle}
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+    volumes:
+      - marketplace-db-data:/var/lib/postgresql/data
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-ecocycle}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # =======================
+  # Transactions Service
+  # =======================
+  transactions:
+    image: ghcr.github.ncsu.edu/${GITHUB_REPOSITORY_OWNER}/ecocycle-transactions-service:${IMAGE_TAG:-latest}
+    container_name: transactions-service-staging
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: staging
+      SPRING_DATASOURCE_URL: jdbc:postgresql://transactions-db:5432/transactions
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-ecocycle}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-ecocycle}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      MARKETPLACE_BASE_URL: http://marketplace:8081
+      USERS_BASE_URL: http://users:8083
+      LOGGING_LEVEL_ROOT: INFO
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
+    depends_on:
+      transactions-db:
+        condition: service_healthy
+      marketplace:
+        condition: service_healthy
+      users:
+        condition: service_healthy
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  transactions-db:
+    image: postgres:16-alpine
+    container_name: transactions-db-staging
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: transactions
+      POSTGRES_USER: ${DB_USERNAME:-ecocycle}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ecocycle}
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+    volumes:
+      - transactions-db-data:/var/lib/postgresql/data
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-ecocycle}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # =======================
+  # Users Service
+  # =======================
+  users:
+    image: ghcr.github.ncsu.edu/${GITHUB_REPOSITORY_OWNER}/ecocycle-users-service:${IMAGE_TAG:-latest}
+    container_name: users-service-staging
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_PROFILES_ACTIVE: staging
+      SPRING_DATASOURCE_URL: jdbc:postgresql://users-db:5432/users
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-ecocycle}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-ecocycle}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      LOGGING_LEVEL_ROOT: INFO
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
+    depends_on:
+      users-db:
+        condition: service_healthy
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  users-db:
+    image: postgres:16-alpine
+    container_name: users-db-staging
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: users
+      POSTGRES_USER: ${DB_USERNAME:-ecocycle}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ecocycle}
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+    volumes:
+      - users-db-data:/var/lib/postgresql/data
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-ecocycle}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # =======================
+  # Frontend
+  # =======================
+  frontend:
+    image: ${DOCKERHUB_USERNAME:-manavshah13}/ecocycle-frontend:${IMAGE_TAG:-latest}
+    container_name: ecocycle-frontend-staging
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      ENVIRONMENT: staging
+    depends_on:
+      marketplace:
+        condition: service_healthy
+      transactions:
+        condition: service_healthy
+      users:
+        condition: service_healthy
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  ecocycle-network:
+    driver: bridge
+    name: ecocycle-staging-network
+
+volumes:
+  marketplace-db-data:
+    name: marketplace-db-staging-data
+  transactions-db-data:
+    name: transactions-db-staging-data
+  users-db-data:
+    name: users-db-staging-data
+

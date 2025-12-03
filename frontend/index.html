@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Ecocycle Frontend</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <h1>Ecocycle Basic Frontend</h1>
+  <h3>Select a Service</h3>
+  <div style="margin-bottom: 20px;">
+    <input id="userIdInput" type="email" placeholder="Enter email address" />
+    <input id="usernameInput" type="text" placeholder="Username (for registration)" style="display:none;" />
+    <button onclick="login()">Login</button>
+    <button onclick="toggleRegister()" id="toggleBtn">Register</button>
+    <button onclick="register()" id="registerBtn" style="display:none;">Create Account</button>
+  </div>
+  <div class="buttons">
+    <button onclick="callService('users')">Users Service</button>
+    <button onclick="callService('marketplace')">Marketplace Service</button>
+    <button onclick="callService('transactions')">Transactions Service</button>
+  </div>
+
+  <div class="output">
+    <h3>Response</h3>
+    <pre id="result">Click a button to fetch data...</pre>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+---
+# Rollback to Previous Version
+- name: Rollback EcoCycle Deployment
+  hosts: "{{ target_env | default('staging') }}"
+  gather_facts: yes
+  
+  vars_prompt:
+    - name: confirm_rollback
+      prompt: "Are you sure you want to ROLLBACK? (yes/no)"
+      private: no
+  
+  pre_tasks:
+    - name: Abort if not confirmed
+      fail:
+        msg: "Rollback aborted by user"
+      when: confirm_rollback != "yes"
+    
+    - name: Display rollback information
+      debug:
+        msg:
+          - "========================================="
+          - "ROLLBACK INITIATED"
+          - "========================================="
+          - "Environment: {{ env_name }}"
+          - "Target host: {{ ansible_host }}"
+  
+  tasks:
+    - name: Check if backup exists
+      stat:
+        path: "{{ app_dir }}/.previous_tags"
+      register: backup_file
+    
+    - name: Fail if no backup found
+      fail:
+        msg: "No previous deployment found to rollback to"
+      when: not backup_file.stat.exists
+    
+    - name: Read previous image tags
+      slurp:
+        src: "{{ app_dir }}/.previous_tags"
+      register: previous_tags_content
+    
+    - name: Set previous tag
+      set_fact:
+        rollback_tag: "{{ previous_tags_content.content | b64decode | trim }}"
+    
+    - name: Display rollback target
+      debug:
+        msg: "Rolling back to image tag: {{ rollback_tag }}"
+    
+    - name: Stop current services
+      community.docker.docker_compose:
+        project_src: "{{ app_dir }}"
+        files:
+          - "{{ compose_file }}"
+        state: absent
+    
+    - name: Deploy previous version
+      community.docker.docker_compose:
+        project_src: "{{ app_dir }}"
+        files:
+          - "{{ compose_file }}"
+        state: present
+        pull: yes
+        recreate: always
+      environment:
+        DOCKERHUB_USERNAME: "{{ dockerhub_username }}"
+        IMAGE_TAG: "{{ rollback_tag }}"
+    
+    - name: Wait for services to start
+      pause:
+        seconds: "{{ health_check_delay }}"
+    
+    - name: Verify rollback health
+      uri:
+        url: "http://{{ ansible_host }}:{{ item }}/actuator/health"
+        method: GET
+        status_code: 200
+      loop:
+        - "{{ marketplace_port }}"
+        - "{{ users_port }}"
+        - "{{ transactions_port }}"
+      register: rollback_health
+      retries: 5
+      delay: 10
+    
+    - name: Display rollback result
+      debug:
+        msg:
+          - "========================================="
+          - "ROLLBACK COMPLETED"
+          - "========================================="
+          - "Rolled back to: {{ rollback_tag }}"
+          - "All services healthy: {{ rollback_health.results | map(attribute='status') | list | unique == [200] }}"
+    
+    - name: Log rollback event
+      copy:
+        content: |
+          Rollback Event - {{ ansible_date_time.iso8601 }}
+          ================================================
+          Environment: {{ env_name }}
+          Rolled back from: {{ image_tag }}
+          Rolled back to: {{ rollback_tag }}
+          Initiated by: {{ ansible_user_id }}
+          Status: {{ 'SUCCESS' if rollback_health.results | map(attribute='status') | list | unique == [200] else 'FAILED' }}
+        dest: "{{ app_dir }}/logs/rollback-{{ ansible_date_time.epoch }}.log"
+        owner: "{{ deploy_user }}"
+        mode: '0644'
+

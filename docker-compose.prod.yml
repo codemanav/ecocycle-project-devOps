@@ -1,0 +1,296 @@
+version: "3.9"
+
+services:
+  # =======================
+  # Marketplace Service
+  # =======================
+  marketplace:
+    image: ghcr.github.ncsu.edu/${GITHUB_REPOSITORY_OWNER}/ecocycle-marketplace-service:${IMAGE_TAG:-latest}
+    container_name: marketplace-service-prod
+    restart: always
+    ports:
+      - "9081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: production
+      SPRING_DATASOURCE_URL: jdbc:postgresql://marketplace-db:5432/marketplace
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRING_JPA_SHOW_SQL: false
+      LOGGING_LEVEL_ROOT: WARN
+      LOGGING_LEVEL_COM_ECOCYCLE: INFO
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
+      MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: when_authorized
+    depends_on:
+      marketplace-db:
+        condition: service_healthy
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  marketplace-db:
+    image: postgres:16-alpine
+    container_name: marketplace-db-prod
+    restart: always
+    environment:
+      POSTGRES_DB: marketplace
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+    volumes:
+      - marketplace-db-data:/var/lib/postgresql/data
+      - ./backups/marketplace:/backups
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # =======================
+  # Transactions Service
+  # =======================
+  transactions:
+    image: ghcr.github.ncsu.edu/${GITHUB_REPOSITORY_OWNER}/ecocycle-transactions-service:${IMAGE_TAG:-latest}
+    container_name: transactions-service-prod
+    restart: always
+    ports:
+      - "9082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: production
+      SPRING_DATASOURCE_URL: jdbc:postgresql://transactions-db:5432/transactions
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRING_JPA_SHOW_SQL: false
+      MARKETPLACE_BASE_URL: http://marketplace:8081
+      USERS_BASE_URL: http://users:8083
+      LOGGING_LEVEL_ROOT: WARN
+      LOGGING_LEVEL_COM_ECOCYCLE: INFO
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
+      MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: when_authorized
+    depends_on:
+      transactions-db:
+        condition: service_healthy
+      marketplace:
+        condition: service_healthy
+      users:
+        condition: service_healthy
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  transactions-db:
+    image: postgres:16-alpine
+    container_name: transactions-db-prod
+    restart: always
+    environment:
+      POSTGRES_DB: transactions
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+    volumes:
+      - transactions-db-data:/var/lib/postgresql/data
+      - ./backups/transactions:/backups
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # =======================
+  # Users Service
+  # =======================
+  users:
+    image: ghcr.github.ncsu.edu/${GITHUB_REPOSITORY_OWNER}/ecocycle-users-service:${IMAGE_TAG:-latest}
+    container_name: users-service-prod
+    restart: always
+    ports:
+      - "9083:8083"
+    environment:
+      SPRING_PROFILES_ACTIVE: production
+      SPRING_DATASOURCE_URL: jdbc:postgresql://users-db:5432/users
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRING_JPA_SHOW_SQL: false
+      LOGGING_LEVEL_ROOT: WARN
+      LOGGING_LEVEL_COM_ECOCYCLE: INFO
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
+      MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: when_authorized
+    depends_on:
+      users-db:
+        condition: service_healthy
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  users-db:
+    image: postgres:16-alpine
+    container_name: users-db-prod
+    restart: always
+    environment:
+      POSTGRES_DB: users
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+    volumes:
+      - users-db-data:/var/lib/postgresql/data
+      - ./backups/users:/backups
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # =======================
+  # Frontend
+  # =======================
+  frontend:
+    image: ${DOCKERHUB_USERNAME:-manavshah13}/ecocycle-frontend:${IMAGE_TAG:-latest}
+    container_name: ecocycle-frontend-prod
+    restart: always
+    ports:
+      - "8080:80"
+    environment:
+      ENVIRONMENT: production
+    depends_on:
+      marketplace:
+        condition: service_healthy
+      transactions:
+        condition: service_healthy
+      users:
+        condition: service_healthy
+    networks:
+      - ecocycle-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+networks:
+  ecocycle-network:
+    driver: bridge
+    name: ecocycle-prod-network
+
+volumes:
+  marketplace-db-data:
+    name: marketplace-db-prod-data
+  transactions-db-data:
+    name: transactions-db-prod-data
+  users-db-data:
+    name: users-db-prod-data
+

@@ -1,3 +1,8 @@
 package com.ecocycle.marketplace.model;
 
-public enum ListingType { SALE, RENTAL, DONATION }
+/** Domain model representing ListingType. */
+public enum ListingType {
+  SALE,
+  RENTAL,
+  DONATION
+}
