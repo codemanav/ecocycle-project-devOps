@@ -59,9 +59,9 @@ jobs:
           # CI builds and pushes 'latest' tag on every push to release/staging
           IMAGE_TAG="latest"
           
-          echo "📦 Deploying Docker images with tag: ${IMAGE_TAG}"
-          echo "🌿 Triggered by branch: ${{ github.event.workflow_run.head_branch }}"
-          echo "🔨 Built from commit: ${{ github.event.workflow_run.head_sha }}"
+          echo "Deploying Docker images with tag: ${IMAGE_TAG}"
+          echo "Triggered by branch: ${{ github.event.workflow_run.head_branch }}"
+          echo "Built from commit: ${{ github.event.workflow_run.head_sha }}"
           
           ansible-playbook -i inventory/staging.ini playbooks/deploy_staging.yml \
             -e "image_tag=${IMAGE_TAG}" \
@@ -74,7 +74,7 @@ jobs:
         run: |
           echo "## Staging Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Deployment completed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "[OK] Deployment completed successfully" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** ${{ github.event.workflow_run.head_branch || github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Services:**" >> $GITHUB_STEP_SUMMARY
           echo "- Frontend: http://${{ env.ANSIBLE_HOST }}" >> $GITHUB_STEP_SUMMARY

@@ -21,7 +21,7 @@ public class MarketplaceClient {
     return webClient
         .get()
         .uri(baseUrl + "/listings/{id}", id)
-        .header("Authorization", "Bearer " + token) // ✅ add token
+        .header("Authorization", "Bearer " + token) // add token
         .retrieve()
         .bodyToMono(ListingDto.class)
         .block();

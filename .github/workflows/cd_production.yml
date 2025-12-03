@@ -58,9 +58,9 @@ jobs:
           # CI builds and pushes 'latest' tag on every push to main/release/production
           IMAGE_TAG="latest"
           
-          echo "🚀 Deploying to PRODUCTION with image tag: ${IMAGE_TAG}"
-          echo "🌿 Triggered by branch: ${{ github.event.workflow_run.head_branch }}"
-          echo "🔨 Built from commit: ${{ github.event.workflow_run.head_sha }}"
+          echo "Deploying to PRODUCTION with image tag: ${IMAGE_TAG}"
+          echo "Triggered by branch: ${{ github.event.workflow_run.head_branch }}"
+          echo "Built from commit: ${{ github.event.workflow_run.head_sha }}"
           
           ansible-playbook -i inventory/production.ini playbooks/deploy_production.yml \
             -e "image_tag=${IMAGE_TAG}" \
@@ -74,7 +74,7 @@ jobs:
         run: |
           echo "## Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Production deployment completed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "[OK] Production deployment completed successfully" >> $GITHUB_STEP_SUMMARY
           echo "**Deployed at:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
