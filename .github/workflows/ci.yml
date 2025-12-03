@@ -37,6 +37,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       
+      # Cache Maven dependencies to speed up Dockerized Maven runs
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
       - name: Verify service directories exist
         run: |
           echo "Validating project structure..."
@@ -63,6 +72,15 @@ jobs:
       
       - name: Checkout code
         uses: actions/checkout@v3
+
+      # Cache Maven dependencies for Checkstyle runs
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
 
       - name: Set up JDK 17
         uses: actions/setup-java@v3
@@ -112,7 +130,16 @@ jobs:
       
       - name: Checkout code
         uses: actions/checkout@v3
-
+      
+      # Cache Maven dependencies for unit tests and coverage
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+      
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
@@ -183,7 +210,16 @@ jobs:
       
       - name: Checkout code
         uses: actions/checkout@v3
-
+      
+      # Cache Maven dependencies for static analysis
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+      
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
@@ -231,7 +267,16 @@ jobs:
       
       - name: Checkout code
         uses: actions/checkout@v3
-
+      
+      # Cache Maven dependencies for security scans
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+      
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
@@ -381,7 +426,11 @@ jobs:
           TMPDIR: ${{ runner.temp }}/docker-tmp
         with:
           context: ./${{ matrix.service }}
-          push: true
+          # Only push images when needed:
+          # - Any direct push (all branches)
+          # - PRs involving release/* branches (used by CD)
+          #   → Skip pushes for PRs to main (validation only) to speed up CI
+          push: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (startsWith(github.head_ref, 'release/') || startsWith(github.base_ref, 'release/'))) }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
