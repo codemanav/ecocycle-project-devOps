@@ -48,7 +48,6 @@ jobs:
             echo "✅ Found: $service"
           done
           echo "✅ All service directories validated successfully"
-
   # Job 1: Code Quality & Linting
   code-quality:
     name: Code Quality & Linting
@@ -75,7 +74,6 @@ jobs:
         run: |
           # Ensure runner user can access Docker socket
           sudo chmod 666 /var/run/docker.sock || true
-
       - name: Run Checkstyle on Marketplace Service
         run: |
           cd marketplace-service
@@ -99,7 +97,6 @@ jobs:
         run: |
           # Fix ownership of Docker-created files
           sudo chown -R $USER:$USER ${{ github.workspace }}/*/target || true
-
   # Job 2: Unit Tests & Code Coverage
   test:
     name: Unit Tests & Coverage
@@ -125,28 +122,23 @@ jobs:
       - name: Set up Docker permissions
         run: |
           sudo chmod 666 /var/run/docker.sock || true
-
       - name: Test Marketplace Service
         run: |
           cd marketplace-service
           docker run --rm -v "$PWD":/app -v "$HOME/.m2":/root/.m2 -w /app maven:3.9.6-eclipse-temurin-17 mvn clean test jacoco:report
-
       - name: Test Users Service
         run: |
           cd users-service
           docker run --rm -v "$PWD":/app -v "$HOME/.m2":/root/.m2 -w /app maven:3.9.6-eclipse-temurin-17 mvn clean test jacoco:report
-
       - name: Test Transactions Service
         run: |
           cd transactions-service
           docker run --rm -v "$PWD":/app -v "$HOME/.m2":/root/.m2 -w /app maven:3.9.6-eclipse-temurin-17 mvn clean test jacoco:report
-
       - name: Fix file permissions for coverage reports
         if: always()
         run: |
           # Fix ownership so GitHub Actions can read the reports
           sudo chown -R $USER:$USER ${{ github.workspace }}/*/target || true
-
       - name: Upload Marketplace Coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
@@ -176,7 +168,6 @@ jobs:
         run: |
           # Clean up Docker-created files for next run
           sudo rm -rf ${{ github.workspace }}/*/target || true
-
   # Job 3: Static Analysis
   static-analysis:
     name: Static Analysis
@@ -202,7 +193,6 @@ jobs:
       - name: Set up Docker permissions
         run: |
           sudo chmod 666 /var/run/docker.sock || true
-
       - name: Run SpotBugs on Marketplace Service
         run: |
           cd marketplace-service
@@ -226,7 +216,6 @@ jobs:
         run: |
           # Fix ownership of Docker-created files
           sudo chown -R $USER:$USER ${{ github.workspace }}/*/target || true
-
   # Job 4: Security Scanning
   security-scan:
     name: Security Scanning
@@ -252,7 +241,6 @@ jobs:
       - name: Set up Docker permissions
         run: |
           sudo chmod 666 /var/run/docker.sock || true
-
       - name: Run Hadolint Dockerfile Security Scan
         run: |
           echo "Scanning Dockerfiles for security issues..."
@@ -276,7 +264,6 @@ jobs:
             exit 1
           fi
           echo "✅ All Dockerfiles passed security scan"
-
       - name: Run OWASP Dependency Check on Marketplace
         run: |
           cd marketplace-service
@@ -300,7 +287,6 @@ jobs:
         run: |
           # Fix ownership so GitHub Actions can read the reports
           sudo chown -R $USER:$USER ${{ github.workspace }}/*/target || true
-
       - name: Upload OWASP Reports
         uses: actions/upload-artifact@v3
         if: always()
@@ -317,7 +303,6 @@ jobs:
         run: |
           # Clean up Docker-created files for next run
           sudo rm -rf ${{ github.workspace }}/*/target || true
-
   # Job 5: Build Docker Images
   build-images:
     name: Build & Push Docker Images
@@ -365,7 +350,6 @@ jobs:
           sudo chown -R $USER:$USER ${{ runner.temp }}/docker-tmp || true
           # Test write access
           touch ${{ runner.temp }}/docker-tmp/test-write && rm ${{ runner.temp }}/docker-tmp/test-write || echo "Warning: Write test failed"
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
         env:
@@ -391,7 +375,6 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr,format=pr-{{number}}
             type=sha,format=short,prefix=sha-
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         env:
@@ -407,7 +390,6 @@ jobs:
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
             VCS_REF=${{ github.sha }}
             VERSION=${{ github.ref_name }}
-
       - name: Run Trivy vulnerability scanner
         if: matrix.service != 'frontend'
         uses: aquasecurity/trivy-action@0.20.0
@@ -417,9 +399,6 @@ jobs:
           output: 'trivy-results-${{ matrix.service }}.txt'
           exit-code: '1'
           severity: 'CRITICAL,HIGH'
-          scanners: 'vuln'
-          timeout: '10m'
-          vuln-type: 'os,library'
 
       - name: Upload Trivy results as artifact
         if: matrix.service != 'frontend'
@@ -510,8 +489,6 @@ jobs:
           echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "**Author:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-
       - name: Fail if any job failed
         if: needs.code-quality.result == 'failure' || needs.test.result == 'failure' || needs.static-analysis.result == 'failure'
         run: exit 1
-

@@ -18,7 +18,10 @@
   <div class="buttons">
     <button onclick="callService('users')">Users Service</button>
     <button onclick="callService('marketplace')">Marketplace Service</button>
-    <button onclick="callService('transactions')">Transactions Service</button>
+    <div style="margin-top: 10px;">
+      <input id="transactionIdInput" type="number" placeholder="Enter Transaction ID" style="margin-right: 5px;" />
+      <button onclick="callService('transactions')">Get Transaction</button>
+    </div>
   </div>
 
   <div class="output">
