@@ -1615,10 +1615,6 @@ docker exec marketplace-service ping users-service
 
 ## <a id="license--contact"></a>📝 License & Contact
 
-**Course:** CSC 519 - DevOps, NC State University  
-**Semester:** Fall 2024  
-**Instructor:** Dr. Chris Parnin
-
 **Team Contact:**
 - Manav Shah: mdshah5@ncsu.edu
 - Yuvraj Singh Bhatia: ybhatia2@ncsu.edu
