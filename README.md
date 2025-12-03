@@ -1656,11 +1656,6 @@ ansible-playbook playbooks/rollback.yml -e "target_env=staging"
 
 ---
 
-**Last Updated:** December 5, 2024  
-**Pipeline Status:** [OK] Operational  
-**Security Status:** [OK] 12+ Features Implemented  
-**Code Coverage:** [OK] 50%+ Across All Services
-
 **For detailed pipeline execution logs and workflow runs, visit:**  
 https://github.ncsu.edu/mdshah5/ecocycle-project/actions
 
