@@ -1,13 +1,19 @@
 name: CI Pipeline
 
 on:
-  push:
-    branches:
-      - '**'  # Run on all branches
+  # Run CI on pull requests (validates before merge)
   pull_request:
     branches:
-      - 'release/**'
       - 'main'
+      - 'release/**'
+      - 'develop'
+  
+  # Run CI on pushes to protected/deployment branches only
+  push:
+    branches:
+      - 'main'
+      - 'release/staging'
+      - 'release/production'
 
 permissions:
   contents: read
@@ -353,16 +359,14 @@ jobs:
     name: Build & Push Docker Images
     runs-on: self-hosted
     needs: [test, static-analysis, security-scan]
-    # Build images on:
-    # - Push to any branch (for development/testing)
-    # - PR to release/* branches (for CD pipeline deployment)
-    # - PR to main (for validation, but main doesn't trigger deployment)
+    # Build images only on:
+    # - Push to main/release branches (for deployment)
+    # - PR to main/release branches (for validation)
     if: |
       github.event_name == 'push' ||
       (github.event_name == 'pull_request' && 
-       (startsWith(github.head_ref, 'release/') || 
-        startsWith(github.base_ref, 'release/') ||
-        github.base_ref == 'main')) 
+       (github.base_ref == 'main' || 
+        startsWith(github.base_ref, 'release/'))) 
     
     permissions:
       contents: read
@@ -463,11 +467,11 @@ jobs:
     name: Integration Tests
     runs-on: self-hosted
     needs: build-images
-    # Run integration tests on push OR on PR to release branches
+    # Run integration tests only when images are built
     if: |
       github.event_name == 'push' ||
       (github.event_name == 'pull_request' && 
-       (startsWith(github.head_ref, 'release/') || 
+       (github.base_ref == 'main' || 
         startsWith(github.base_ref, 'release/')))
     
     services:

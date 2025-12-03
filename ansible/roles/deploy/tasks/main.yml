@@ -17,16 +17,16 @@
     mode: '0644'
     force: yes
 
-- name: Remove any existing containers with conflicting names (safe cleanup)
+- name: Remove any existing containers for this environment only (safe cleanup)
   shell: |
-    docker rm -f marketplace-service-staging marketplace-service-prod \
-      transactions-service-staging transactions-service-prod \
-      users-service-staging users-service-prod \
-      marketplace-db-staging marketplace-db-prod \
-      transactions-db-staging transactions-db-prod \
-      users-db-staging users-db-prod \
-      ecocycle-frontend-staging ecocycle-frontend-prod \
-      ecocycle-frontend || true
+    docker rm -f \
+      marketplace-service-{{ env_name }} \
+      transactions-service-{{ env_name }} \
+      users-service-{{ env_name }} \
+      marketplace-db-{{ env_name }} \
+      transactions-db-{{ env_name }} \
+      users-db-{{ env_name }} \
+      frontend-{{ env_name }} || true
   changed_when: false
 
 - name: Deploy services (pull, stop, start)

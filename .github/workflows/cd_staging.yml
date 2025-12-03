@@ -7,14 +7,6 @@ on:
       - completed
     branches:
       - 'release/staging'
-      - 'release/**'
-
-  workflow_dispatch:
-    inputs:
-      image_tag:
-        description: 'Docker image tag to deploy'
-        required: false
-        default: 'latest'
 
 env:
   ANSIBLE_HOST: 152.7.176.20
@@ -26,13 +18,10 @@ jobs:
     name: Deploy to Staging
     runs-on: self-hosted
 
-    # Only run if:
-    # 1) CI Pipeline succeeded, OR
-    # 2) Workflow was triggered manually
+    # Only run if CI Pipeline succeeded
     if: |
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success') ||
-      github.event_name == 'workflow_dispatch'
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Checkout code
@@ -65,10 +54,15 @@ jobs:
       - name: Deploy to Staging
         run: |
           cd ansible
-
-          # Use manual input OR default to latest
-          IMAGE_TAG="${{ github.event.inputs.image_tag || 'latest' }}"
-
+          
+          # Use 'latest' tag which is built by CI pipeline
+          # CI builds and pushes 'latest' tag on every push to release/staging
+          IMAGE_TAG="latest"
+          
+          echo "📦 Deploying Docker images with tag: ${IMAGE_TAG}"
+          echo "🌿 Triggered by branch: ${{ github.event.workflow_run.head_branch }}"
+          echo "🔨 Built from commit: ${{ github.event.workflow_run.head_sha }}"
+          
           ansible-playbook -i inventory/staging.ini playbooks/deploy_staging.yml \
             -e "image_tag=${IMAGE_TAG}" \
             -e "dockerhub_username=${{ env.DOCKERHUB_USERNAME }}" \

@@ -98,15 +98,13 @@ function callService(service) {
     if (service === "users") url = "/users";
     if (service === "marketplace") url = "/listings";
     if (service === "transactions") {
-        // For transactions, we need a transaction ID from the input field
-        const transactionIdInput = document.getElementById("transactionIdInput");
-        const transactionId = transactionIdInput ? transactionIdInput.value.trim() : "";
-        if (!transactionId || transactionId === "") {
-            alert("Please enter a Transaction ID");
-            document.getElementById("result").textContent = "Error: Transaction ID is required. Please enter a Transaction ID in the input field.";
+        // For transactions, we need a transaction ID
+        const transactionId = prompt("Enter Transaction ID:");
+        if (!transactionId || transactionId.trim() === "") {
+            document.getElementById("result").textContent = "Error: Transaction ID is required";
             return;
         }
-        url = "/transactions/" + transactionId;
+        url = "/transactions/" + transactionId.trim();
     }
 
     if (!url) {

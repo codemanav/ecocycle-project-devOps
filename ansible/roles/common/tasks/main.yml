@@ -107,7 +107,6 @@
     port: '22'
     proto: tcp
   become: yes
-  when: env_name == 'production'
 
 - name: Configure firewall - Allow application ports
   ufw:
@@ -119,13 +118,11 @@
     - "{{ marketplace_port }}"
     - "{{ transactions_port }}"
     - "{{ users_port }}"
-  when: env_name == 'production'
 
 - name: Enable firewall
   ufw:
     state: enabled
   become: yes
-  when: env_name == 'production'
 
 - name: Create environment file
   template:
