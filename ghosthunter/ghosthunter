@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Ghost Hunter CLI launcher: uses the project venv if present, otherwise python3 on PATH.
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PY="$DIR/.venv/bin/python"; [ -x "$PY" ] || PY=python3
+exec "$PY" "$DIR/cli.py" "$@"

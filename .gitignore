@@ -77,3 +77,9 @@ temp/
 
 # Lectures (project specific)
 lectures/
+
+# Ghost Hunter runtime output
+ghosthunter/audit.jsonl
+ghosthunter/postmortems/
+ghosthunter/.incident.lock
+.pytest_cache/

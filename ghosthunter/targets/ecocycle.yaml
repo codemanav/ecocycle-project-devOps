@@ -1,0 +1,72 @@
+# Ghost Hunter target definition. Copy this file to point Ghost Hunter at any docker-compose app,
+# then run with GHOSTHUNTER_TARGET=targets/<yours>.yaml.
+name: EcoCycle
+description: >
+  Circular-economy marketplace. Three Spring Boot services, each with its own Postgres, behind nginx.
+compose:
+  dir: ..                       # relative to this file's parent (ghosthunter/); where docker-compose.yml lives
+  env: {DB_PASSWORD: ecocycle}
+
+# Services Ghost Hunter health-checks. depends_on = containers whose logs are pulled when this service is DOWN.
+services:
+  marketplace-service:
+    health: http://localhost:8081/actuator/health
+    depends_on: [marketplace-db]
+  transactions-service:
+    health: http://localhost:8082/actuator/health
+    depends_on: [transactions-db, marketplace-service, users-service]
+  users-service:
+    health: http://localhost:8083/actuator/health
+    depends_on: [users-db]
+
+# Every container Ghost Hunter may inspect or act on. Actions on anything else are rejected.
+containers: [marketplace-service, transactions-service, users-service,
+             marketplace-db, transactions-db, users-db, ecocycle-frontend]
+
+# Containers left off the metrics chart sent to the model (static frontends add noise).
+chart_exclude: [ecocycle-frontend]
+
+# Call graph, given to the model as context for root-cause reasoning.
+call_graph:
+  - transactions-service -> marketplace-service (GET /listings/{id}) on offer/donate
+  - transactions-service -> users-service (PUT /users/{id}/greenscore) on COMPLETED, no client timeout
+  - each service -> its own Postgres (marketplace-db, transactions-db, users-db)
+
+# Real requests that must succeed for an incident to count as recovered.
+smoke:
+  headers: {Authorization: "Bearer x"}
+  requests:
+    - {method: POST, url: "http://localhost:8082/transactions/offer", json: {listingId: 1, offerAmount: 10}}
+    - {method: GET, url: "http://localhost:8083/users"}
+    - {method: GET, url: "http://localhost:8081/listings"}
+
+# Which remediation actions are enabled for this target (see actions.py), with per-target limits.
+actions:
+  start_container: {}
+  restart_container: {}
+  raise_memory_limit: {max_mb: 1024}
+  escalate: {}
+
+# Fault-injection scenarios for demos/tests. Each step is a command list run in the compose dir.
+scenarios:
+  A:
+    title: Stop users-db
+    story: A naive restart script would restart users-service. Wrong, the database is the ghost.
+    inject:
+      - [docker, stop, users-db]
+  B:
+    title: Starve marketplace memory
+    story: A naive restart script restarts straight back into the same OOM. A crash loop.
+    inject:
+      - [docker, update, --restart, on-failure, --memory, 100m, --memory-swap, 100m, marketplace-service]
+      - [docker, restart, marketplace-service]
+  C:
+    title: Freeze marketplace
+    story: Here a restart IS the right call. Ghost Hunter should choose it only now.
+    inject:
+      - [docker, pause, marketplace-service]
+reset:
+  - [docker, unpause, users-db]
+  - [docker, unpause, marketplace-service]
+  - [docker, compose, up, -d, --force-recreate, marketplace]   # drops injected memory limit / restart policy
+  - [docker, compose, up, -d]

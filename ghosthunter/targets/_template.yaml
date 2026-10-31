@@ -1,0 +1,27 @@
+# Copy to targets/<your-app>.yaml and run:  GHOSTHUNTER_TARGET=targets/<your-app>.yaml ./ghosthunter status
+name: MyApp
+description: One or two sentences about the app; this is given to the model as context.
+compose:
+  dir: ../path/to/your/compose/project   # relative to ghosthunter/
+  env: {}                                 # extra env vars for `docker compose` (e.g. passwords)
+
+services:                                 # what gets health-checked
+  api:
+    health: http://localhost:8000/health  # 2xx (and JSON status "UP" if present) = healthy
+    depends_on: [db, cache]               # containers whose logs are pulled when this is DOWN
+containers: [api, db, cache]              # the allowlist: actions on anything else are rejected
+chart_exclude: []                         # containers to leave off the metrics chart
+call_graph:
+  - api -> db (reads/writes)
+  - api -> cache (sessions)
+smoke:                                    # real requests that must pass for "recovered"
+  headers: {}
+  requests:
+    - {method: GET, url: "http://localhost:8000/items"}
+actions:                                  # which actions from actions.py are enabled, with limits
+  start_container: {}
+  restart_container: {}
+  raise_memory_limit: {max_mb: 1024}
+  escalate: {}
+scenarios: {}                             # optional fault-injection demos (see targets/ecocycle.yaml)
+reset: []

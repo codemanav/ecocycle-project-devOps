@@ -4,7 +4,7 @@ from collections import defaultdict, deque
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from core import CFG
+from core import TARGET
 
 WINDOW_S = 120
 _hist = defaultdict(lambda: deque(maxlen=200))  # name -> (ts, cpu%, mem_mb, limit_mb)
@@ -19,7 +19,7 @@ def _mb(s):
     return 0.0
 
 def _loop():
-    names = [c for c in CFG["containers"] if c != "ecocycle-frontend"]
+    names = [c for c in TARGET["containers"] if c not in (TARGET.get("chart_exclude") or [])]
     while True:
         try:
             out = subprocess.run(["docker", "stats", "--no-stream", "--format", "{{json .}}", *names],
