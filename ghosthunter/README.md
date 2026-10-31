@@ -219,5 +219,4 @@ Ghost Hunter is a Hacktoberfest project and contributions are welcome. See
 [CONTRIBUTING.md](CONTRIBUTING.md) and [GOOD_FIRST_ISSUES.md](GOOD_FIRST_ISSUES.md).
 
 ---
-Built at Hacktoberfest Hack Day Raleigh 2026. The demo app, EcoCycle, existed before the event;
-Ghost Hunter was built during it.
+GhostHunter was built at Hacktoberfest Hack Day Raleigh 2026. The demo app, EcoCycle, existed before the event;
