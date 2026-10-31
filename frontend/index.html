@@ -1,31 +1,114 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Ecocycle Frontend</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EcoCycle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="11" fill="none" stroke="currentColor" stroke-width="4" stroke-dasharray="58 12" stroke-linecap="round"/><circle cx="25" cy="8" r="3.5" fill="var(--sun)"/></svg>
+      EcoCycle
+    </div>
+    <div class="who"><span id="who">Not signed in</span> <button class="btn small" id="signout" hidden>Sign out</button></div>
+  </header>
 
-  <h1>Ecocycle Basic Frontend</h1>
-  <h3>Select a Service</h3>
-  <div style="margin-bottom: 20px;">
-    <input id="userIdInput" type="email" placeholder="Enter email address" />
-    <input id="usernameInput" type="text" placeholder="Username (for registration)" style="display:none;" />
-    <button onclick="login()">Login</button>
-    <button onclick="toggleRegister()" id="toggleBtn">Register</button>
-    <button onclick="register()" id="registerBtn" style="display:none;">Create Account</button>
-  </div>
-  <div class="buttons">
-    <button onclick="callService('users')">Users Service</button>
-    <button onclick="callService('marketplace')">Marketplace Service</button>
-    <button onclick="callService('transactions')">Transactions Service</button>
-  </div>
+  <section class="hero">
+    <h1>Give things a second life.</h1>
+    <p>List what you no longer need, claim what someone else is passing on, and keep good stuff out of the bin.</p>
+    <div class="row">
+      <button class="btn sun" id="cta-list">List an item</button>
+      <button class="btn" id="cta-browse">Browse listings</button>
+    </div>
+  </section>
 
-  <div class="output">
-    <h3>Response</h3>
-    <pre id="result">Click a button to fetch data...</pre>
-  </div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="market" aria-selected="true">Marketplace</button>
+    <button role="tab" data-tab="deals" aria-selected="false">Transactions</button>
+    <button role="tab" data-tab="account" aria-selected="false">Account</button>
+  </nav>
 
-  <script src="script.js"></script>
+  <section class="panel" id="p-market">
+    <div id="banner" class="banner" hidden></div>
+    <div class="card">
+      <h2>List an item</h2>
+      <p class="sub">Set the price to 0 to give it away.</p>
+      <form id="f-list">
+        <label>Title<input id="l-title" required maxlength="80" placeholder="Desk lamp"></label>
+        <label>Description<input id="l-desc" placeholder="Works, small scratch on the base"></label>
+        <label>Price ($)<input id="l-price" type="number" min="0" step="0.01" value="0"></label>
+        <button class="btn solid" type="submit">Post listing</button>
+      </form>
+    </div>
+    <div class="row between">
+      <h2 class="h2">Available now</h2>
+      <button class="btn small" id="reload">Refresh</button>
+    </div>
+    <div class="grid" id="listings"></div>
+  </section>
+
+  <section class="panel" id="p-deals" hidden>
+    <div class="card">
+      <h2>Find a transaction</h2>
+      <p class="sub">Look up a deal by its transaction number.</p>
+      <form id="f-find">
+        <label>Transaction number<input id="t-id" required></label>
+        <button class="btn solid" type="submit">Look up</button>
+      </form>
+      <div class="rows" id="deal-result"></div>
+    </div>
+    <div class="card">
+      <h2>Make an offer</h2>
+      <p class="sub">Use the listing number shown on a tag.</p>
+      <form id="f-offer">
+        <label>Listing number<input id="o-id" required inputmode="numeric"></label>
+        <label>Your offer ($)<input id="o-amt" type="number" min="0" step="0.01" value="0"></label>
+        <button class="btn solid" type="submit">Send offer</button>
+      </form>
+    </div>
+    <div class="card">
+      <h2>Claim a free item</h2>
+      <p class="sub">For listings priced at 0.</p>
+      <form id="f-claim">
+        <label>Listing number<input id="c-id" required inputmode="numeric"></label>
+        <button class="btn solid" type="submit">Claim it</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="panel" id="p-account" hidden>
+    <div class="card">
+      <h2>Sign in or create an account</h2>
+      <p class="sub">Sign in needs only your email. A new account also needs a username.</p>
+      <form id="f-auth">
+        <label>Email<input id="a-email" type="email" required autocomplete="email" placeholder="you@example.com"></label>
+        <label>Username (new accounts)<input id="a-user" autocomplete="username" placeholder="ecofan"></label>
+        <div class="row">
+          <button class="btn solid" type="submit" data-act="login">Sign in</button>
+          <button class="btn" type="submit" data-act="register">Create account</button>
+        </div>
+      </form>
+    </div>
+    <div class="card">
+      <h2>Community</h2>
+      <p class="sub">Everyone registered with EcoCycle.</p>
+      <button class="btn small" id="load-users">Show members</button>
+      <div class="rows" id="users"></div>
+    </div>
+  </section>
+
+  <details>
+    <summary>Raw server response</summary>
+    <pre id="raw">Nothing yet. Every request shows up here.</pre>
+  </details>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="script.js"></script>
 </body>
 </html>
