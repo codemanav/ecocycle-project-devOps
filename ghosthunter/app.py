@@ -4,7 +4,7 @@ import agent, core, model, metrics, postmortem
 from watch import Watcher
 
 st.set_page_config(page_title="Ghost Hunter", page_icon="🎃", layout="wide")
-metrics.start()  # sample docker stats from app start so the chart has history
+# metrics are sampled on demand (night watch / injections / incidents), not continuously
 
 # ---------------- Halloween styling ----------------
 st.markdown("""
@@ -44,7 +44,7 @@ code { color: #ffb37a !important; }
 
 @st.cache_resource
 def get_watcher():
-    return Watcher(interval=5)
+    return Watcher()
 
 watcher = get_watcher()
 
@@ -60,8 +60,8 @@ use_chart = st.sidebar.toggle("📈 Send metrics chart to Gemma (multimodal)", v
 watcher.use_chart = use_chart
 st.sidebar.divider()
 watch_on = st.sidebar.toggle("🌙 Night watch (autonomous)", value=watcher.running,
-                             help="Ghost Hunter polls health every 5s, hunts down incidents on its own, "
-                                  "then writes a postmortem.")
+                             help="Ghost Hunter listens for Docker events (crash, OOM, stop, pause) and checks health "
+                                  "every 30s, hunts down incidents on its own, then writes a postmortem.")
 if watch_on and not watcher.running:
     watcher.start()
 elif not watch_on and watcher.running:
@@ -85,7 +85,8 @@ def decision_card(data, dt):
         if data.get("chart_observation"):
             st.markdown(f"**📈 Seen in the chart:** {data['chart_observation']}")
         if data.get("note"):
-            st.caption(data["note"])
+            (st.warning if "local open-weight" in data["note"] else st.caption)(f"🔒 {data['note']}"
+                if "local open-weight" in data["note"] else data["note"])
         st.markdown("**🕯️ Evidence:**")
         for e in data.get("evidence", []):
             st.code(str(e), language=None)
@@ -141,7 +142,7 @@ with live_tab:
     if watcher.running:
         # Night watch: just inject; the watcher detects and fixes it on its own.
         if chosen:
-            core.inject(chosen)
+            metrics.boost(); core.inject(chosen)
             st.toast(f"👻 Summoned {chosen} · {SCEN[chosen]['title']}. No button press needed: Ghost Hunter is watching.")
 
         @st.fragment(run_every=2)
@@ -188,7 +189,7 @@ with live_tab:
             if chosen or manual:
                 if chosen:
                     st.info(f"👻 Summoning **{chosen} · {SCEN[chosen]['title']}**. {SCEN[chosen].get('story', '')}")
-                    core.inject(chosen)
+                    metrics.boost(); core.inject(chosen)
                     with st.spinner("Listening for things that go bump in the night…"):
                         h, secs = agent.wait_for_failure()
                     st.write(f"⏱ ghost sighted after {secs}s")

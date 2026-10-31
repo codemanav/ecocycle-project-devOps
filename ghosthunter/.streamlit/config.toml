@@ -11,3 +11,6 @@ headless = true
 
 [browser]
 gatherUsageStats = false
+
+[client]
+toolbarMode = "viewer"   # hide Streamlit's Deploy button and developer menu

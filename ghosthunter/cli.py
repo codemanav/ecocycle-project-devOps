@@ -35,7 +35,7 @@ def out(args, data, human):
 def _chart(args):
     if not args.chart:
         return None
-    metrics.start()
+    metrics.boost()
     print(f"sampling container metrics for {args.chart_seconds}s for the chart…", file=sys.stderr)
     time.sleep(args.chart_seconds)
     return metrics.chart_png()
@@ -102,7 +102,7 @@ def cmd_recover(args):
             print(f"⏱  {name} ({dt}s): {json.dumps(data, default=str)[:200]}")
     use_chart = bool(args.chart)
     if use_chart:
-        metrics.start(); time.sleep(args.chart_seconds)
+        metrics.boost(); time.sleep(args.chart_seconds)
     try:
         rec = agent.run_incident(emit, use_chart=use_chart, on_thought=_thought_printer(args), trigger="cli")
     except agent.Busy as e:
@@ -120,8 +120,11 @@ def cmd_recover(args):
 
 def cmd_watch(args):
     from watch import Watcher
-    w = Watcher(interval=args.interval, use_chart=bool(args.chart),
+    w = Watcher(slow_interval=args.interval, use_events=not args.no_events, use_chart=bool(args.chart),
                 log=lambda m: print(time.strftime("%H:%M:%S"), m, flush=True))
+    import signal
+    signal.signal(signal.SIGTERM, lambda *_: w.stop())      # launchd/systemd/docker stop
+    signal.signal(signal.SIGINT, signal.default_int_handler)  # Ctrl-C, even when started in the background
     w.start()
     try:
         while w.running:
@@ -170,7 +173,10 @@ def main(argv=None):
     r.add_argument("--dry-run", action="store_true"); r.add_argument("--yes", action="store_true", help="allow actions")
     r.add_argument("--no-postmortem", action="store_true"); r.add_argument("--force", action="store_true")
     r.set_defaults(fn=cmd_recover)
-    w = sub.add_parser("watch"); w.add_argument("--interval", type=float, default=5); w.set_defaults(fn=cmd_watch)
+    w = sub.add_parser("watch")
+    w.add_argument("--interval", type=float, default=30, help="fallback health-check interval (s)")
+    w.add_argument("--no-events", action="store_true", help="poll only; don't listen for Docker events")
+    w.set_defaults(fn=cmd_watch)
     sub.add_parser("scenarios").set_defaults(fn=cmd_scenarios)
     h = sub.add_parser("haunt"); h.add_argument("scenario"); h.set_defaults(fn=cmd_haunt)
     p = sub.add_parser("postmortems"); p.add_argument("--show", type=int); p.set_defaults(fn=cmd_postmortems)

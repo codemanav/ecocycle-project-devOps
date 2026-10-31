@@ -34,11 +34,16 @@ because the database is the problem.
   escalated to a human.
 - **Verified recovery.** An incident only counts as fixed when health checks *and* real smoke requests
   pass. If not, Gemma gets a second attempt, with what it already tried.
-- **🌙 Night watch.** Continuous autonomous mode: polls health, confirms a failure across two polls,
-  handles it, backs off on failures it can't fix, and ignores false alarms.
+- **🌙 Night watch.** Event-driven autonomous mode. It wakes immediately on Docker events (crash, OOM
+  kill, stop, pause, unhealthy), falls back to a 30 s health check for silent failures, confirms a failure
+  twice before acting, backs off on failures it can't fix, and ignores false alarms. See
+  [Night watch](#night-watch-triggers-and-cost).
 - **📜 Gemma-written postmortems.** Blameless Markdown postmortem for every incident (timeline, root
   cause with evidence, resolution, "why not a naive restart?", follow-ups) with the metrics chart attached.
 - **Open-weight backend.** Switch to local Gemma 4 (`gemma4:e4b` via Ollama) with one flag.
+- **Automatic local fallback.** If the Gemini API errors or times out mid-incident and Ollama is running,
+  the same decision is made by local open-weight Gemma 4, and the decision card and postmortem say so.
+  If no model is reachable at all, Ghost Hunter escalates to a human instead of acting blind.
 - **Agent skill + CLI.** Coding agents can call Ghost Hunter as a tool (see [`skill/ghost-hunter/SKILL.md`](skill/ghost-hunter/SKILL.md)).
 - **Reusable harness.** Point it at any docker-compose app with one YAML file; add actions with one decorated function.
 
@@ -128,13 +133,36 @@ ghosthunter status                       health of every service
 ghosthunter diagnose                     root cause + proposed action (changes nothing)
 ghosthunter recover --dry-run            diagnose + allowlist check (changes nothing)
 ghosthunter recover --yes                diagnose → act → verify → postmortem
-ghosthunter watch                        night watch, headless
+ghosthunter watch [--interval 30]        night watch, headless (event-driven)
 ghosthunter postmortems [--show N]       read postmortems
 ghosthunter haunt A|B|C|reset            demo fault injection
   global: --json  --backend gemini|ollama  --target file.yaml  --chart  --think
 ```
 
 Exit codes: `0` healthy/recovered, `1` unhealthy/not recovered, `2` action rejected, `3` error.
+
+## Night watch: triggers and cost
+
+| Trigger | How | Cost while healthy |
+|---|---|---|
+| Docker events for the target's containers: `die`, `oom`, `kill`, `stop`, `pause`, `health_status: unhealthy` | One `docker events` stream, pushed by the daemon | None, it just waits |
+| Fallback health check (silent failures: hangs, error responses) | HTTP GET on each health URL | 3 small requests every 30 s |
+| Something looks wrong (event seen or a check failed) | Health checks every 3 s for 90 s | Only during incidents |
+
+Ghost Hunter acts after **2 consecutive failed checks**. Gemma 4 is only called once a failure is
+confirmed, never while things are healthy. Metrics for the chart are sampled every 15 s while night
+watch is on (so the chart has history from before the incident), every 2 s during an incident, and
+not at all otherwise. The local model is unloaded after 5 minutes idle (`OLLAMA_KEEP_ALIVE`).
+
+Measured idle over 60 s on the EcoCycle demo (Mac, everything healthy):
+
+| | Health checks / min | `docker stats` calls / min | CPU (Ghost Hunter + child processes) |
+|---|---|---|---|
+| Before (fixed 5 s polling, 2 s sampling) | 12 | 30 | 1.39 s |
+| Now (event-driven) | 2 | 4–5 | 0.90 s, mostly Python start-up |
+
+It does have to keep running to protect the app, like any monitor. Run it headless with
+`./ghosthunter watch` (or as a launchd/systemd service) rather than through the UI.
 
 ## Use it on your own app
 
@@ -166,6 +194,8 @@ pick it up from the registry automatically.
 | `OLLAMA_NUM_CTX` | `8192` | Context window for the local model |
 | `GHOSTHUNTER_TARGET` | `targets/ecocycle.yaml` | Target definition |
 | `GHOSTHUNTER_DEADLINE_S` | `150` | Wall-clock limit per model call |
+| `OLLAMA_KEEP_ALIVE` | `5m` | How long the local model stays loaded after a call |
+| `GHOSTHUNTER_FALLBACK` | `ollama` | Fall back to local Gemma 4 when the Gemini API fails; `none` to disable |
 
 ## Limitations
 

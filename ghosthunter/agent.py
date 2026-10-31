@@ -40,7 +40,7 @@ def run_incident(emit=print, use_chart=True, on_thought=None, trigger="manual"):
         INCIDENT_LOCK.release()
 
 def _run(emit, use_chart, on_thought, trigger):
-    metrics.start()
+    metrics.boost()
     rec = {"id": time.strftime("%Y%m%d-%H%M%S"), "trigger": trigger, "model": model.describe(),
            "started": time.time(), "timeline": [], "decisions": [], "charts": []}
 
@@ -73,7 +73,14 @@ def _run(emit, use_chart, on_thought, trigger):
         if chart:
             step(f"chart #{attempt}", lambda: chart)
         if on_thought: on_thought(None)
-        d = step(f"reason #{attempt}", lambda: model.decide(ev, previous or None, chart, on_thought))
+        def reason():
+            try:
+                return model.decide(ev, previous or None, chart, on_thought)
+            except Exception as e:  # API down and no local fallback: never act blind, hand off to a human
+                return {"root_cause": "unknown: no model available to diagnose", "evidence": [],
+                        "action": "escalate", "confidence": 0,
+                        "params": {"reason": f"model unavailable ({type(e).__name__}: {str(e)[:120]})"}}
+        d = step(f"reason #{attempt}", reason)
         rec["decisions"].append(d)
         ok, why = core.validate(d)
         if not ok:

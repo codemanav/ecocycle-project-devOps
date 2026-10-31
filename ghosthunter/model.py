@@ -2,7 +2,7 @@
   gemini (default) - Gemma 4 via the Gemini API (GHOSTHUNTER_MODEL, default gemma-4-26b-a4b-it)
   ollama           - open-weight Gemma 4 running locally (OLLAMA_MODEL, default gemma4:e4b);
                      incident data never leaves the machine."""
-import os, json, re, pathlib, time
+import os, json, re, pathlib, threading, time
 _env = pathlib.Path(__file__).parent / ".env"
 if _env.exists():
     for _l in _env.read_text().splitlines():
@@ -31,7 +31,36 @@ _client = None
 
 def deadline(): return int(os.environ.get("GHOSTHUNTER_DEADLINE_S", "150"))
 
-def backend(): return os.environ.get("GHOSTHUNTER_MODEL_BACKEND", "gemini").lower()
+_tl = threading.local()  # per-thread backend override, used for the automatic local fallback
+
+def backend(): return getattr(_tl, "override", None) or os.environ.get("GHOSTHUNTER_MODEL_BACKEND", "gemini").lower()
+
+def ollama_ready():
+    """True if a local Ollama server is up and has the configured model pulled."""
+    import requests
+    try:
+        host = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+        tags = requests.get(host + "/api/tags", timeout=1.5).json().get("models", [])
+        want = os.environ.get("OLLAMA_MODEL", "gemma4:e4b")
+        return any(m.get("name") == want or m.get("model") == want for m in tags)
+    except Exception:
+        return False
+
+def _with_local_fallback(fn, on_thought):
+    """Run fn() on the configured backend; if the Gemini API fails and local open-weight Gemma 4 is
+    available (GHOSTHUNTER_FALLBACK=ollama, the default), run it again locally."""
+    try:
+        return fn(), None
+    except Exception as e:
+        if backend() != "gemini" or os.environ.get("GHOSTHUNTER_FALLBACK", "ollama") != "ollama" or not ollama_ready():
+            raise
+        why = f"{type(e).__name__}: {str(e)[:80]}"
+        if on_thought: on_thought(f"\n\n[Gemini API failed ({why}); falling back to local open-weight Gemma 4]\n\n")
+        _tl.override = "ollama"
+        try:
+            return fn(), f"Gemini API failed ({why}); decided by local open-weight {model_id()} instead"
+        finally:
+            _tl.override = None
 
 def model_id():
     if backend() == "ollama":
@@ -66,7 +95,7 @@ def _call_ollama(text, chart=None, on_thought=None, raw=False):
         msg["images"] = [base64.b64encode(chart).decode()]
     url = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/") + "/api/chat"
     body = {"model": model_id(), "messages": [msg], "stream": True, "think": True,
-            "options": {"temperature": 0.2, "num_ctx": int(os.environ.get("OLLAMA_NUM_CTX", "8192"))}, "keep_alive": "30m"}
+            "options": {"temperature": 0.2, "num_ctx": int(os.environ.get("OLLAMA_NUM_CTX", "8192"))}, "keep_alive": os.environ.get("OLLAMA_KEEP_ALIVE", "5m")}
     timeout = int(os.environ.get("GHOSTHUNTER_TIMEOUT_MS", "120000")) / 1000
     answer, t0 = "", time.time()
     with requests.post(url, json=body, stream=True, timeout=timeout) as r:
@@ -112,6 +141,12 @@ def _ask(text, chart, on_thought):
     return _call([text], on_thought)
 
 def decide(evidence, previous=None, chart=None, on_thought=None):
+    d, note = _with_local_fallback(lambda: _decide(evidence, previous, chart, on_thought), on_thought)
+    if note:
+        d["note"] = note; d["model"] = "gemma4 (local fallback)"
+    return d
+
+def _decide(evidence, previous=None, chart=None, on_thought=None):
     prompt = "EVIDENCE:\n" + json.dumps(evidence, separators=(",", ":"))
     if previous: prompt += "\n\nPREVIOUS ATTEMPTS (failed):\n" + json.dumps(previous, separators=(",", ":"))
     text = system_prompt() + "\nKeep your internal reasoning short: check each container once, then decide.\n\n" + prompt
@@ -127,6 +162,7 @@ def decide(evidence, previous=None, chart=None, on_thought=None):
         return _ask(text, None, on_thought)
     except Exception as e:
         if on_thought: on_thought(f"\n\n[call failed: {type(e).__name__}; retrying]\n\n")
+        time.sleep(2)
         return _ask(text, None, on_thought)
 
 
@@ -148,8 +184,11 @@ INCIDENT DATA:
 
 def write_postmortem(incident, on_thought=None):
     text = POSTMORTEM + json.dumps(incident, default=str, separators=(",", ":"))[:20000]
-    if backend() == "ollama":
-        md = _call_ollama(text, None, on_thought, raw=True)
-    else:
-        md = _call([text], on_thought, raw=True)
+    def gen():
+        if backend() == "ollama":
+            return _call_ollama(text, None, on_thought, raw=True)
+        return _call([text], on_thought, raw=True)
+    md, note = _with_local_fallback(gen, on_thought)
+    if note:
+        md += f"\n\n_{note}._"
     return re.sub(r"^```(?:markdown|md)?\s*|\s*```\s*$", "", md.strip())

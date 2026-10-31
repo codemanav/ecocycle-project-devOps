@@ -1,18 +1,33 @@
-"""Continuous watch mode: poll health, and when a failure is confirmed, run the full
-detect -> investigate -> reason -> recover -> verify loop and write a postmortem — no button press.
+"""Night watch: continuous, event-driven incident response — no button press.
 
-Headless:  python watch.py [--interval 5] [--no-chart]
+Triggers (whichever comes first):
+  1. Docker events for the target's containers (die, oom, kill, stop, pause, unhealthy). Pushed by the
+     Docker daemon, so waiting for them costs nothing. Each one wakes the watcher immediately and starts
+     an alert window of fast health polls (dependency failures take ~20 s to show up in health checks).
+  2. A slow fallback health poll (default every 30 s) for failures that produce no Docker event,
+     e.g. an app that hangs or starts returning errors while its container keeps running.
+A failure must be seen on `confirm` consecutive polls before Ghost Hunter acts.
+
+Headless:  python watch.py [--slow 30] [--fast 3] [--no-events] [--no-chart]
 In the UI: a Watcher thread is started from app.py and its .state is rendered live.
 """
-import argparse, threading, time
+import argparse, json, signal, subprocess, threading, time
 import agent, core, metrics, postmortem
 
+TRIGGER_ACTIONS = {"die", "oom", "kill", "stop", "pause", "health_status: unhealthy"}
+
 class Watcher:
-    def __init__(self, interval=5, confirm=2, cooldown=20, backoff=300, use_chart=True, log=None):
-        self.interval, self.confirm, self.cooldown, self.backoff = interval, confirm, cooldown, backoff
-        self.use_chart = use_chart
+    def __init__(self, slow_interval=30, fast_interval=3, alert_window=90, confirm=2, cooldown=20, backoff=300,
+                 use_events=True, use_chart=True, log=None):
+        self.slow, self.fast, self.alert_window = slow_interval, fast_interval, alert_window
+        self.confirm, self.cooldown, self.backoff = confirm, cooldown, backoff
+        self.use_events, self.use_chart = use_events, use_chart
         self.log = log or (lambda msg: None)
         self._stop = threading.Event()
+        self._wake = threading.Event()
+        self._alert_until = 0.0
+        self._events_proc = None
+        self.polls = 0
         self._thread = None
         self.lock = threading.Lock()  # guards .state for readers in other threads
         self.state = {"status": "stopped", "health": {}, "last_poll": None, "streak": 0,
@@ -30,7 +45,38 @@ class Watcher:
             self._thread.start()
 
     def stop(self):
-        self._stop.set()
+        self._stop.set(); self._wake.set()
+        if self._events_proc:
+            self._events_proc.terminate()
+
+    # ---- Docker event listener ----
+    def _listen(self):
+        names = core.TARGET["containers"]
+        cmd = ["docker", "events", "--format", "{{json .}}", "--filter", "type=container"]
+        for n in names:
+            cmd += ["--filter", f"container={n}"]
+        last = {}
+        while not self._stop.is_set():
+            try:
+                self._events_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+                for line in self._events_proc.stdout:
+                    try:
+                        ev = json.loads(line)
+                    except ValueError:
+                        continue
+                    action = ev.get("Action") or ev.get("status") or ""
+                    name = (ev.get("Actor") or {}).get("Attributes", {}).get("name", "?")
+                    if action not in TRIGGER_ACTIONS:
+                        continue
+                    self._alert_until = time.time() + self.alert_window
+                    metrics.boost()
+                    if time.time() - last.get(name, 0) > 5:  # die/kill/stop arrive together: log once
+                        self._event(f"📡 docker event: {name} {action}, checking now")
+                    last[name] = time.time()
+                    self._wake.set()
+            except Exception as e:
+                self._event(f"📡 docker events unavailable ({type(e).__name__}); relying on polling")
+            self._stop.wait(5)  # stream ended (daemon restart?): reconnect
 
     # ---- helpers ----
     def _event(self, msg):
@@ -45,12 +91,17 @@ class Watcher:
 
     # ---- main loop ----
     def _loop(self):
-        metrics.start()
+        metrics.set_background(True)
         self._set(status="watching")
-        self._event(f"👀 watch mode on — polling every {self.interval}s, acting after {self.confirm} failed polls")
+        if self.use_events:
+            threading.Thread(target=self._listen, daemon=True, name="ghosthunter-events").start()
+        self._event(f"👀 night watch on: {'listening for Docker events + ' if self.use_events else ''}"
+                    f"health check every {self.slow}s (every {self.fast}s when something looks wrong); "
+                    f"acting after {self.confirm} failed checks")
         suppressed = {}  # frozenset(symptoms) -> until-ts, after an incident we could not fix
         streak = 0
         while not self._stop.is_set():
+            self.polls += 1
             h = core.check_health()
             bad = core.unhealthy(h)
             streak = streak + 1 if bad else 0
@@ -69,9 +120,12 @@ class Watcher:
                         self._event(f"🙋 escalated; will not retry the same failure for {self.backoff}s")
                     self._stop.wait(self.cooldown)
                     continue
-            self._stop.wait(self.interval)
+            alert = bool(bad) or time.time() < self._alert_until
+            self._wake.wait(self.fast if alert else self.slow)
+            self._wake.clear()
+        metrics.set_background(False)
         self._set(status="stopped")
-        self._event("⏹ watch mode off")
+        self._event("⏹ night watch off")
 
     def _handle(self, bad):
         self._event(f"🚨 incident confirmed ({', '.join(bad)}) — Ghost Hunter taking over")
@@ -123,15 +177,21 @@ class Watcher:
         return rec
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description="Ghost Hunter continuous watch mode")
-    ap.add_argument("--interval", type=float, default=5)
+    ap = argparse.ArgumentParser(description="Ghost Hunter night watch")
+    ap.add_argument("--slow", type=float, default=30, help="health-check interval when all is quiet")
+    ap.add_argument("--fast", type=float, default=3, help="interval while something looks wrong")
+    ap.add_argument("--no-events", action="store_true", help="don't listen for Docker events (poll only)")
     ap.add_argument("--no-chart", action="store_true")
     a = ap.parse_args()
-    w = Watcher(interval=a.interval, use_chart=not a.no_chart,
+    w = Watcher(slow_interval=a.slow, fast_interval=a.fast, use_events=not a.no_events, use_chart=not a.no_chart,
                 log=lambda m: print(time.strftime("%H:%M:%S"), m, flush=True))
+    # stop cleanly on SIGTERM (launchd/systemd/docker stop) as well as Ctrl-C
+    signal.signal(signal.SIGTERM, lambda *_: w.stop())
+    signal.signal(signal.SIGINT, signal.default_int_handler)
     w.start()
     try:
         while w.running:
             time.sleep(1)
     except KeyboardInterrupt:
         w.stop(); time.sleep(1)
+    print(f"health checks: {w.polls} · docker stats samples: {metrics.samples}", flush=True)

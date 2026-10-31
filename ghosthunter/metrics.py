@@ -1,4 +1,10 @@
-"""Background sampler of `docker stats` + chart rendering for Gemma's multimodal input."""
+"""On-demand sampler of `docker stats` + chart rendering for Gemma's multimodal input.
+
+Sampling is gated so an idle Ghost Hunter costs almost nothing:
+  - boosted (every FAST_S): for a while after a Docker event, a fault injection, or during an incident
+  - background (every BG_S): while night watch is on, so the chart has pre-incident history
+  - otherwise: no `docker stats` calls at all
+"""
 import io, json, subprocess, threading, time
 from collections import defaultdict, deque
 import matplotlib
@@ -10,6 +16,30 @@ WINDOW_S = 120
 _hist = defaultdict(lambda: deque(maxlen=200))  # name -> (ts, cpu%, mem_mb, limit_mb)
 _lock = threading.Lock()
 _started = False
+FAST_S, BG_S = 2, 15
+_boost_until = 0.0
+_background = False
+_wake = threading.Event()
+samples = 0  # number of `docker stats` calls made (for efficiency measurements)
+
+def boost(seconds=150):
+    """Sample every FAST_S for the next `seconds` (incident, docker event, fault injection)."""
+    global _boost_until
+    _boost_until = max(_boost_until, time.time() + seconds)
+    start(); _wake.set()
+
+def set_background(on):
+    """Low-rate sampling while night watch is on, so a chart has history from before the incident."""
+    global _background
+    _background = on
+    start(); _wake.set()
+
+def _interval():
+    if time.time() < _boost_until:
+        return FAST_S
+    if _background:
+        return BG_S
+    return None
 
 def _mb(s):
     s = s.strip()
@@ -19,8 +49,14 @@ def _mb(s):
     return 0.0
 
 def _loop():
+    global samples
     names = [c for c in TARGET["containers"] if c not in (TARGET.get("chart_exclude") or [])]
     while True:
+        iv = _interval()
+        if iv is None:            # idle: no sampling until boosted or background is switched on
+            _wake.wait(); _wake.clear()
+            continue
+        samples += 1
         try:
             out = subprocess.run(["docker", "stats", "--no-stream", "--format", "{{json .}}", *names],
                                  capture_output=True, text=True, timeout=15).stdout
@@ -38,7 +74,7 @@ def _loop():
                     _hist[n].append((now, 0.0, 0.0, 0.0))
         except Exception:
             pass
-        time.sleep(2)
+        _wake.wait(iv); _wake.clear()
 
 def start():
     global _started
@@ -62,7 +98,7 @@ def chart_png():
         lim = [p[3] for p in pts if p[3] and p[3] < 4000]  # only draw real (small) limits
         if lim:
             ax2.axhline(lim[-1], ls="--", lw=1, color=ax2.lines[-1].get_color())
-    ax1.set_ylabel("CPU %"); ax1.set_title("EcoCycle containers, last 2 min (0 = now)")
+    ax1.set_ylabel("CPU %"); ax1.set_title(f"{TARGET['name']} containers, last 2 min (0 = now)")
     ax2.set_ylabel("Memory MB (dashed = limit)"); ax2.set_xlabel("seconds")
     ax1.legend(fontsize=7, ncol=3, loc="upper left")
     for a in (ax1, ax2):
