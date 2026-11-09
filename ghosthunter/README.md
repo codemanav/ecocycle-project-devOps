@@ -292,6 +292,9 @@ Slack / PagerDuty notifications and approvals · Kubernetes target · more actio
 image, rotate config) · confidence threshold that asks a human before acting · learning from past
 postmortems · screenshot input (paste a Grafana panel).
 
+Deeper systems work (model-serving performance, leader election, partition and replication
+scenarios, a Kubernetes target) is planned in [ENGINEERING_ROADMAP.md](ENGINEERING_ROADMAP.md).
+
 ## Contributing
 
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
