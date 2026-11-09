@@ -128,7 +128,7 @@ class Watcher:
         self._event("⏹ night watch off")
 
     def _handle(self, bad):
-        self._event(f"🚨 incident confirmed ({', '.join(bad)}) — Ghost Hunter taking over")
+        self._event(f"incident confirmed ({', '.join(bad)}) — Ghost Hunter taking over")
         cur = {"steps": [], "started": time.time(), "phase": "investigating", "postmortem": None}
         self._set(status="incident", current=cur, thought="")
 
@@ -140,7 +140,7 @@ class Watcher:
                 self._event(f"🧠 Gemma: {data.get('action')} {data.get('params')} — {data.get('root_cause')}")
             elif name.startswith("verify"):
                 ok, res = data
-                self._event(f"{'✅ recovered' if ok else '❌ not recovered'} (verify {res['seconds']}s)")
+                self._event(f"{'recovered' if ok else 'not recovered'} (verify {res['seconds']}s)")
 
         def on_thought(chunk):
             with self.lock:

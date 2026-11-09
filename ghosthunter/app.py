@@ -59,7 +59,14 @@ if model.backend() == "ollama":
 use_chart = st.sidebar.toggle("📈 Send metrics chart to Gemma (multimodal)", value=True)
 watcher.use_chart = use_chart
 st.sidebar.divider()
-watch_on = st.sidebar.toggle("🌙 Night watch (autonomous)", value=watcher.running,
+if "gh_session_init" not in st.session_state:
+    # Every new browser session starts with night watch OFF, even if the server-wide watcher was left running
+    # or the browser re-sent an old toggle value after a restart.
+    st.session_state["gh_session_init"] = True
+    st.session_state["night_watch"] = False
+    if watcher.running:
+        watcher.stop()
+watch_on = st.sidebar.toggle("🌙 Night watch (autonomous)", key="night_watch",
                              help="Ghost Hunter listens for Docker events (crash, OOM, stop, pause) and checks health "
                                   "every 30s, hunts down incidents on its own, then writes a postmortem.")
 if watch_on and not watcher.running:
@@ -78,16 +85,16 @@ st.markdown(
 # ---------------- shared renderers ----------------
 def decision_card(data, dt):
     with st.container(border=True):
-        st.markdown(f"### 🔮 Gemma 4's diagnosis · {dt}s")
+        st.markdown(f"### Gemma 4's diagnosis · {dt}s")
         st.markdown(f"**The ghost (root cause):** {data.get('root_cause')}")
         st.markdown(f"**Exorcism (action):** `{data.get('action')}` `{data.get('params')}` · "
                     f"confidence **{data.get('confidence')}**")
         if data.get("chart_observation"):
-            st.markdown(f"**📈 Seen in the chart:** {data['chart_observation']}")
+            st.markdown(f"**Seen in the chart:** {data['chart_observation']}")
         if data.get("note"):
-            (st.warning if "local open-weight" in data["note"] else st.caption)(f"🔒 {data['note']}"
+            (st.warning if "local open-weight" in data["note"] else st.caption)(f"{data['note']}"
                 if "local open-weight" in data["note"] else data["note"])
-        st.markdown("**🕯️ Evidence:**")
+        st.markdown("**Evidence:**")
         for e in data.get("evidence", []):
             st.code(str(e), language=None)
 
@@ -99,9 +106,9 @@ def render_step(name, data, dt):
     elif name.startswith("verify"):
         ok, res = data
         (st.success if ok else st.error)(
-            f"{'✨ Exorcised' if ok else '💀 Still haunted'}: verified in {res['seconds']}s · smoke: {res['smoke']}")
+            f"{'Exorcised' if ok else 'Still haunted'}: verified in {res['seconds']}s · smoke: {res['smoke']}")
     elif name.startswith("execute"):
-        st.info(f"🪄 {name}: {data}")
+        st.info(f"{name}: {data}")
     else:
         with st.expander(f"{name} · {dt}s"):
             st.json(data) if isinstance(data, (dict, list)) else st.code(str(data))
@@ -176,8 +183,10 @@ with live_tab:
                     with st.expander("Last hunt, step by step"):
                         for name, data, dt in last_inc["steps"]:
                             render_step(name, data, dt)
-                st.markdown("##### 🕸️ Activity")
-                for ts, msg in reversed(s["events"][-12:]):
+                st.markdown("##### Activity")
+                shown = [(ts, m) for ts, m in s["events"]
+                         if m.startswith(("incident confirmed", "recovered", "not recovered"))]
+                for ts, msg in reversed(shown[-12:]):
                     st.markdown(f"`{ts}` {msg}")
         live_feed()
     else:
@@ -185,20 +194,23 @@ with live_tab:
             st.subheader("🏚️ Services")
             health_list(core.check_health())
         with right:
-            st.subheader("🕸️ Hunt timeline")
-            if chosen or manual:
-                if chosen:
-                    st.info(f"👻 Summoning **{chosen} · {SCEN[chosen]['title']}**. {SCEN[chosen].get('story', '')}")
-                    metrics.boost(); core.inject(chosen)
-                    with st.spinner("Listening for things that go bump in the night…"):
+            st.subheader("Hunt timeline")
+            if chosen:
+                metrics.boost(); core.inject(chosen)
+                st.session_state["injected_at"] = time.time()
+                st.info(f"Injected **{chosen} · {SCEN[chosen]['title']}**. {SCEN[chosen].get('story', '')}  \n"
+                        "Nothing is hunting. Click **Hunt now** when you want Ghost Hunter to investigate.")
+            if manual:
+                if time.time() - st.session_state.pop("injected_at", 0) < 90:
+                    with st.spinner("Waiting for the fault to show up in health checks…"):
                         h, secs = agent.wait_for_failure()
-                    st.write(f"⏱ ghost sighted after {secs}s")
+                    st.write(f"failure visible after {secs}s")
 
                 live = {"box": None, "text": ""}
                 def on_thought(chunk):
                     if chunk is None:  # a new reasoning step starts
                         live["text"] = ""
-                        live["box"] = st.expander("🔮 Gemma 4 is peering into the logs… (live)", expanded=True).empty()
+                        live["box"] = st.expander("Gemma 4 is peering into the logs… (live)", expanded=True).empty()
                         return
                     live["text"] += chunk
                     if live["box"]: live["box"].markdown(live["text"][-3000:])
@@ -206,22 +218,20 @@ with live_tab:
                 try:
                     rec = agent.run_incident(render_step, use_chart=use_chart, on_thought=on_thought)
                 except agent.Busy as e:
-                    st.warning(f"⏸ {e}. Try again in a moment.")
+                    st.warning(f"{e}. Try again in a moment.")
                     st.stop()
                 if rec.get("note") == "nothing wrong":
-                    st.info("🟢 No ghosts here. All services healthy.")
+                    st.info("No ghosts here. All services healthy.")
                 else:
                     (st.success if rec["recovered"] else st.error)(
-                        f"✨ Exorcised: {rec['duration']}s from detection to verified fix" if rec["recovered"]
-                        else f"💀 Still haunted: {rec.get('outcome')}")
-                    if rec["recovered"]:
-                        st.snow()
-                    with st.spinner("📜 Gemma is writing the postmortem…"):
+                        f"Exorcised: {rec['duration']}s from detection to verified fix" if rec["recovered"]
+                        else f"Still haunted: {rec.get('outcome')}")
+                    with st.spinner("Gemma is writing the postmortem…"):
                         path = postmortem.write(rec)
-                    st.success(f"📜 Postmortem saved: postmortems/{path.name} (see the Postmortems tab)")
-            else:
-                st.write("Summon a ghost on the left, or turn on **🌙 Night watch** in the sidebar "
-                         "and let Ghost Hunter catch failures on its own.")
+                    st.success(f"Postmortem saved: postmortems/{path.name} (see the Postmortems tab)")
+            elif not chosen:
+                st.write("Summon a ghost to inject a fault, then click **Hunt now**. Ghost Hunter never hunts "
+                         "on its own unless you switch on **Night watch** in the sidebar.")
 
 # ---------------- postmortems tab ----------------
 with pm_tab:

@@ -61,7 +61,7 @@ def _diagnose(args):
     chart = _chart(args)
     t = time.time()
     d = model.decide(ev, chart=chart, on_thought=_thought_printer(args))
-    d["_model"] = model.describe(); d["_seconds"] = round(time.time() - t, 1)
+    d["_model"] = d.get("model") or model.describe(); d["_seconds"] = round(time.time() - t, 1)
     ok, why = core.validate(d)
     return h, d, ok, why
 
@@ -71,6 +71,8 @@ def _fmt_decision(d, ok, why):
              f"🛡  allowlist  : {'allowed' if ok else 'REJECTED — ' + why}"]
     if d.get("chart_observation") and d["chart_observation"] != "no chart":
         lines.append(f"📈 chart      : {d['chart_observation']}")
+    if d.get("note"):
+        lines.append(f"🔒 note       : {d['note']}")
     lines += ["🕯  evidence   :"] + [f"     - {e}" for e in d.get("evidence", [])]
     lines.append(f"   ({d.get('_model')}, {d.get('_seconds')}s)")
     return "\n".join(lines)
@@ -97,7 +99,8 @@ def cmd_recover(args):
         if args.json or isinstance(data, bytes):
             return
         if name.startswith("reason"):
-            print(_fmt_decision({**data, "_model": model.describe(), "_seconds": dt}, *core.validate(data)))
+            print(_fmt_decision({**data, "_model": data.get("model") or model.describe(), "_seconds": dt},
+                                *core.validate(data)))
         else:
             print(f"⏱  {name} ({dt}s): {json.dumps(data, default=str)[:200]}")
     use_chart = bool(args.chart)
