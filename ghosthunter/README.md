@@ -51,22 +51,79 @@ because the database is the problem.
 
 ```mermaid
 flowchart LR
-    subgraph App["Your docker-compose app"]
-        S1[service] --- D1[(db)]
-        S2[service] --- D2[(db)]
-    end
-    W["🌙 Watch / CLI / UI"] -->|poll /health| App
-    W --> I["🔎 Investigate<br/>state · OOM · restarts · error logs"]
-    App -. docker stats .-> M["📈 metrics chart (PNG)"]
-    I --> G{{"🔮 Gemma 4<br/>Gemini API or local Ollama"}}
-    M --> G
-    G -->|"JSON: root_cause, evidence,<br/>action, params, confidence"| A["🛡 Allowlist<br/>(target YAML + actions.py)"]
-    A -->|allowed| X["🪄 Execute"]
-    A -->|rejected / escalate| H["🙋 Human"]
-    X --> V["✅ Verify<br/>health + real requests"]
-    V -->|not fixed: 2nd attempt| I
-    V -->|fixed| P["📜 Gemma writes postmortem"]
+    A["Detect<br/>Docker events + health poll"] --> B["Investigate<br/>state, logs, metrics chart"]
+    B --> C["<b>REASON</b><br/><b>Gemma 4</b> picks the action<br/>text + chart image in, JSON out"]
+    M1["Gemma 4 on Gemini API<br/>default"] <--> C
+    M2["OPEN-WEIGHT Gemma 4<br/>runs locally with Ollama<br/>data never leaves your machine"] <-.->|"automatic fallback,<br/>or chosen as backend"| C
+    C --> D{"Allowlist<br/>check"}
+    D -->|allowed| E["Execute"]
+    D -->|"rejected, or Gemma<br/>chose to escalate"| H["Escalate to human"]
+    E --> F{"Verify<br/>real requests"}
+    F -->|fixed| G["Postmortem<br/><b>written by Gemma 4</b>"]
+    F -->|"not fixed: retry once"| B
+    F -->|"still broken"| H
+    H --> G
+
+    classDef a fill:#eff6ff,stroke:#2563eb,color:#1e3a8a
+    classDef g fill:#fffbeb,stroke:#d97706,color:#78350f
+    classDef o fill:#ecfdf5,stroke:#059669,color:#065f46
+    classDef r fill:#fef2f2,stroke:#dc2626,color:#7f1d1d
+    classDef gem fill:#ede9fe,stroke:#7c3aed,stroke-width:5px,color:#4c1d95
+    classDef oss fill:#dcfce7,stroke:#16a34a,stroke-width:5px,color:#14532d
+    class A,B,E a
+    class D g
+    class F o
+    class H r
+    class C,G,M1 gem
+    class M2 oss
 ```
+
+<details>
+<summary>Full incident flow: triggers, locking, target file, retries and logging</summary>
+
+```mermaid
+flowchart TD
+    APP["🐳 Your docker-compose app"]
+
+    subgraph Start["How an incident starts"]
+        EV["📡 Docker events<br/>die · oom · kill · stop · pause · unhealthy"]
+        POLL["⏱ Fallback health check<br/>every 30 s, every 3 s while alerting"]
+        NW["🌙 Night watch · watch.py<br/>acts after 2 failed checks"]
+        UI["🖥 UI · app.py<br/>Hunt now"]
+        CLI["⌨️ CLI · cli.py<br/>recover --yes"]
+        EV --> NW
+        POLL --> NW
+    end
+
+    APP --> EV
+    APP --> POLL
+    NW --> LOCK
+    UI --> LOCK
+    CLI --> LOCK
+    LOCK["🔒 Incident lock<br/>one incident at a time, across processes"] --> DET
+
+    TGT[("🎯 Target YAML<br/>services · health URLs · containers<br/>call graph · smoke requests · actions")]
+
+    subgraph Loop["Incident loop · agent.py · up to 2 attempts · every step logged to audit.jsonl"]
+        DET["🩺 Detect<br/>re-check health URLs"] -->|still unhealthy| INV["🔎 Investigate · core.py<br/>docker inspect every container<br/>error logs of failing services + dependencies"]
+        INV --> GEM{{"🔮 Gemma 4 · model.py<br/>Gemini API, falls back to local Ollama"}}
+        CH["📈 Metrics chart · metrics.py<br/>docker stats, last 2 min"] -. PNG image .-> GEM
+        GEM -->|"JSON: root cause, evidence,<br/>action, params, confidence"| AL["🛡 Allowlist · actions.py<br/>action enabled? container listed? within limits?"]
+        AL -->|allowed| EX["🪄 Execute<br/>docker start / restart / update"]
+        EX --> VER["✅ Verify<br/>health + real smoke requests"]
+        VER -->|"not fixed: retry, telling Gemma<br/>what was already tried"| INV
+    end
+
+    TGT -. configures .-> Loop
+    DET -->|healthy again| FA["🌫 False alarm<br/>no postmortem"]
+    VER -->|fixed| OK["✨ Recovered"]
+    VER -->|still broken after 2 attempts| HUM["🙋 Escalated to a human"]
+    AL -->|"rejected · escalate ·<br/>no model reachable"| HUM
+    OK --> PM["📜 Gemma writes the postmortem<br/>postmortems/*.md + chart"]
+    HUM --> PM
+```
+
+</details>
 
 | File | Role |
 |---|---|
@@ -74,9 +131,9 @@ flowchart LR
 | [`actions.py`](actions.py) | Pluggable action registry: model prompt, validation and execution in one place |
 | [`model.py`](model.py) | Gemma 4 client: Gemini API or Ollama, streaming thoughts, image input, deadlines, fallbacks |
 | [`agent.py`](agent.py) | The incident loop, audit log, cross-process incident lock |
-| [`watch.py`](watch.py) | Night watch: autonomous polling + incident handling |
+| [`watch.py`](watch.py) | Night watch: wakes on Docker events, falls back to health checks, confirms before acting |
 | [`postmortem.py`](postmortem.py) | Gemma-written postmortems |
-| [`metrics.py`](metrics.py) | `docker stats` sampler and chart renderer |
+| [`metrics.py`](metrics.py) | On-demand `docker stats` sampler and the chart image sent to Gemma |
 | [`cli.py`](cli.py) / [`ghosthunter`](ghosthunter) | CLI for humans, scripts and coding agents |
 | [`app.py`](app.py) | Streamlit UI |
 | [`targets/`](targets/) | Target definitions (EcoCycle + a template) |
