@@ -23,7 +23,7 @@ from the repo root), and either a `GEMINI_API_KEY` in `ghosthunter/.env` or Olla
 scenario and a `reset` so others can reproduce your demo.
 
 **A new failure scenario.** Add it to a target's `scenarios:` with a `story` explaining what a naive
-restart script would do. Run it against both backends and add the result to [BENCHMARKS.md](BENCHMARKS.md).
+restart script would do. Run it against both backends and add the result to the results table in the README.
 
 **A new model backend.** Add a `_call_<backend>()` in [`model.py`](model.py) that streams thoughts
 through `on_thought` and returns the raw answer, then route to it from `_ask()` and `write_postmortem()`.

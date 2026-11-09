@@ -121,8 +121,23 @@ ollama pull gemma4:e4b                      # ~9.5 GB
 | **B** memory limit too low → OOM crash loop | Restarts into the same OOM, forever | `raise_memory_limit(marketplace-service, 512)` |
 | **C** `marketplace-service` frozen | Restarts it. Correct this time | `restart_container(marketplace-service)` |
 
-Scenario C matters: Gemma restarts only when restarting is actually right. Both backends get all three
-right; see [BENCHMARKS.md](BENCHMARKS.md).
+Scenario C matters: Gemma restarts only when restarting is actually right.
+
+### Results: Gemini API vs local open-weight Gemma 4
+
+Same agent, evidence, prompt and allowlist; only the backend changes. Measured on a 16 GB Apple-silicon
+MacBook with the demo app running, metrics chart included. Times are one model decision; detection,
+the action and verification add about 10–20 s.
+
+| Scenario | Gemini API `gemma-4-26b-a4b-it` | Local Ollama `gemma4:e4b` |
+|---|---|---|
+| **A** users-db stopped | ✅ 23.0 s | ✅ 39.9 s |
+| **B** OOM crash loop | ✅ 28.6 s | ✅ 39.7 s |
+| **C** service frozen | ✅ 44.0 s | ✅ 43.1 s |
+
+Both backends chose the correct action every time. The API model's latency varied a lot (13–180 s across
+a day of runs), which is why model calls have a deadline, a retry and the local fallback. The local model
+was steady at about 40 s, but reads the metrics chart less reliably and needs ~9.4 GB of memory while loaded.
 
 In the UI, turn on **🌙 Night watch**, click a ghost, and don't touch anything else.
 
@@ -154,15 +169,9 @@ confirmed, never while things are healthy. Metrics for the chart are sampled eve
 watch is on (so the chart has history from before the incident), every 2 s during an incident, and
 not at all otherwise. The local model is unloaded after 5 minutes idle (`OLLAMA_KEEP_ALIVE`).
 
-Measured idle over 60 s on the EcoCycle demo (Mac, everything healthy):
-
-| | Health checks / min | `docker stats` calls / min | CPU (Ghost Hunter + child processes) |
-|---|---|---|---|
-| Before (fixed 5 s polling, 2 s sampling) | 12 | 30 | 1.39 s |
-| Now (event-driven) | 2 | 4–5 | 0.90 s, mostly Python start-up |
-
-It does have to keep running to protect the app, like any monitor. Run it headless with
-`./ghosthunter watch` (or as a launchd/systemd service) rather than through the UI.
+While everything is healthy that comes to about 2 health checks and 4–5 `docker stats` calls a minute.
+Like any monitor it has to keep running to protect the app: run it headless with `./ghosthunter watch`
+(or as a launchd/systemd service) rather than through the UI.
 
 ## Use it on your own app
 
@@ -205,7 +214,6 @@ pick it up from the registry automatically.
   makes the diagnosis easier than a real hang would.
 - Gemma 4 thinks for ~1–2k tokens per decision, so a diagnosis takes **~20–45 s**. Fine for incident
   response, too slow for per-request decisions.
-- The local `e4b` model reads the metrics chart less reliably than the API model (see benchmarks).
 
 ## Roadmap
 
@@ -215,8 +223,7 @@ postmortems · screenshot input (paste a Grafana panel).
 
 ## Contributing
 
-Ghost Hunter is a Hacktoberfest project and contributions are welcome. See
-[CONTRIBUTING.md](CONTRIBUTING.md) and [GOOD_FIRST_ISSUES.md](GOOD_FIRST_ISSUES.md).
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 GhostHunter was built at Hacktoberfest Hack Day Raleigh 2026. The demo app, EcoCycle, existed before the event;
