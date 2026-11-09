@@ -194,9 +194,23 @@ the action and verification add about 10–20 s.
 
 Both backends chose the correct action every time. The API model's latency varied a lot (13–180 s across
 a day of runs), which is why model calls have a deadline, a retry and the local fallback. The local model
-was steady at about 40 s, but reads the metrics chart less reliably and needs ~9.4 GB of memory while loaded.
+took 40–45 s in these runs (92 s in a later one), reads the metrics chart less reliably, and needs ~9.4 GB
+of memory while loaded.
 
 In the UI, turn on **🌙 Night watch**, click a ghost, and don't touch anything else.
+
+## Engineering highlights
+
+Measured on the EcoCycle demo with injected faults on one machine; single runs unless noted.
+
+| Area | How it works | Result |
+|---|---|---|
+| **Root-cause accuracy** | Reasons over health, container state, filtered logs and the call graph, so it fixes the container that is actually broken, not the one showing symptoms | 23 of 23 logged decisions chose the correct action across three fault classes (database outage, OOM crash loop, hung process), on both backends |
+| **Detection** | Docker event stream (die, oom, kill, stop, pause, unhealthy) plus adaptive health checks: every 30 s when quiet, every 3 s on alert, confirmed twice before acting | 6 s from fault to confirmed incident (about 12 s with the earlier fixed 5 s polling); 2 idle health checks a minute instead of 12, and 4–5 `docker stats` calls instead of 30 |
+| **Safety** | The model only proposes an action as JSON; deterministic checks on the action, target container and parameter limits run before anything executes | Rejected or undiagnosable incidents go to a human; model output is never executed directly |
+| **Closed-loop recovery** | Recovery counts only when health checks and real transactional requests pass; a failed fix triggers a second diagnosis that includes what was already tried | Resolved two simultaneous faults (a frozen service and a stopped database) in one incident |
+| **Concurrency** | In-process mutex plus a cross-process `flock`; unresolved failures suppressed for 5 minutes; clean shutdown on SIGTERM | When the UI watcher and the CLI hit the same incident, the second stood by instead of acting twice |
+| **Inference** | Gemini API or open-weight Gemma 4 served locally through Ollama (its MLX backend on an Apple-silicon GPU), with streaming, wall-clock deadlines, retries and automatic switch-over | Switch-over verified by forcing every API call to fail: the local model diagnosed and fixed the incident |
 
 ## CLI
 

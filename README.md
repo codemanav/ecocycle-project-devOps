@@ -19,6 +19,7 @@
 - [Security Implementation](#security-implementation)
 - [Setup & Deployment](#setup--deployment)
 - [Testing & Quality Gates](#testing--quality-gates)
+- [Reliability & Failure-Mode Testing](#reliability--failure-mode-testing)
 - [Monitoring & Health Checks](#monitoring--health-checks)
 - [Documentation](#documentation)
 - [Learning](#learning-resources)
@@ -499,6 +500,27 @@ echo "[OK] All health checks passed"
 | **Dockerfile Security** | Hadolint | 0 critical issues | CI |
 | **Image Vulnerabilities** | Trivy | 0 CRITICAL/HIGH | CI |
 | **Health Checks** | Ansible | All services UP | ansible/roles/healthcheck |
+
+## <a id="reliability--failure-mode-testing"></a>Reliability & Failure-Mode Testing
+
+EcoCycle is the reference system for [Ghost Hunter](https://github.com/codemanav/ghost-hunter), an
+autonomous incident-response agent that injects faults into the running stack, diagnoses the root cause,
+applies a guarded fix and verifies recovery with real requests.
+
+| Fault injected | What a "restart the failing service" script does | Correct fix |
+|---|---|---|
+| `users-db` stopped | Restarts `users-service`, the wrong service | Start `users-db` |
+| Marketplace memory limit cut to 100 MB, causing an OOM crash loop | Restarts straight back into the same OOM | Raise the memory limit to 512 MB |
+| `marketplace-service` frozen | Restarts it, which is correct here | Restart `marketplace-service` |
+
+**Database per service.** Each service owns its own PostgreSQL database, so a database failure stays
+contained: with `users-db` stopped, `users-service` went down while the marketplace and transactions
+services stayed up.
+
+**Known risk: cascading hang.** When a transaction is marked `COMPLETED`, `transactions-service` calls
+`users-service` (`PUT /users/{id}/greenscore`) through a blocking WebClient call with no client timeout
+(`UsersClient.java`). A hung `users-service` would therefore hang `transactions-service` too. The planned fix
+is a client timeout plus a circuit breaker, with a fault-injection test to prove it.
 
 ## <a id="monitoring--health-checks"></a>Monitoring & Health Checks
 
